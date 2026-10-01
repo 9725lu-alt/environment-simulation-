@@ -1,0 +1,1026 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body style="margin:0"><title>Maple Street Flood Run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed storm-night 3D street, HUD over the scene, control rail on the right (bottom sheet on phones). Single dark look by choice. */
+:root {
+  color-scheme: dark;
+  --night: #0d141c;
+  --panel: #121b25;
+  --raise: #182431;
+  --line: #263749;
+  --fg: #dbe6ef;
+  --muted: #8ea3b6;
+  --accent: #9fd4ff;
+  --water: #3a9cc4;
+  --ok: #5fd38d;
+  --warn: #f0b040;
+  --bad: #ff6b5e;
+  --f-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html, body { height: 100%; }
+body { background: var(--night); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.45; overflow: hidden; }
+* { box-sizing: border-box; }
+
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 372px; height: 100%; }
+.stage { position: relative; min-width: 0; overflow: hidden; }
+#gl { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#gl:active { cursor: grabbing; }
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+.tag { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); white-space: nowrap;
+  font: 500 11px/1.25 var(--f-mono); color: var(--fg); background: rgba(13, 20, 28, 0.84);
+  border-left: 2px solid var(--muted); padding: 3px 6px 3px 6px; border-radius: 2px; }
+.tag b { font-weight: 500; color: var(--accent); }
+.tag.seg { pointer-events: auto; cursor: pointer; }
+.tag.ok { border-color: var(--ok); }
+.tag.warn { border-color: var(--warn); }
+.tag.bad { border-color: var(--bad); }
+.tag.sel { outline: 1px solid var(--accent); }
+.tag.robot { border-color: var(--accent); }
+.tag.place { color: var(--muted); border-color: transparent; background: rgba(13, 20, 28, 0.6); }
+.tag.hazard { border-color: var(--bad); color: #ffd2cd; }
+
+.hud { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none; }
+.hud-card { background: rgba(13, 20, 28, 0.8); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.hud-card dt { font: 500 10px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.hud-card dd { margin: 0; font: 600 18px/1.1 var(--f-display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.clock { font: 600 26px/1 var(--f-display) !important; }
+.bar { display: inline-block; vertical-align: middle; width: 54px; height: 6px; background: var(--line); border-radius: 3px; margin-left: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); width: 45%; }
+.hint { position: absolute; left: 16px; bottom: 12px; font: 400 11px/1.3 var(--f-mono); color: var(--muted); pointer-events: none; }
+.scale-note { position: absolute; right: 16px; bottom: 12px; font: 400 11px/1.3 var(--f-mono); color: var(--muted); pointer-events: none; text-align: right; }
+
+.pill { display: inline-block; font: 500 11px/1 var(--f-mono); letter-spacing: 0.04em; padding: 4px 7px; border-radius: 3px; white-space: nowrap; }
+.pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); }
+.pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.pill.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 16%, transparent); }
+.pill.info { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+.panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding-inline: 20px; padding-block: 20px 28px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.eyebrow { margin: 0 0 6px; font: 500 11px/1.4 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font: 700 34px/1 var(--f-display); letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance; }
+.lede { margin: 8px 0 0; color: var(--muted); max-width: 62ch; }
+h2 { margin: 0 0 8px; font: 600 15px/1.2 var(--f-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: inherit; color: inherit; }
+.btn { background: var(--raise); border: 1px solid var(--line); border-radius: 4px; padding: 7px 12px; cursor: pointer; font: 500 13px/1.2 var(--f-body); }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: #0b1620; border-color: var(--accent); font-weight: 600; min-width: 76px; }
+.btn:focus-visible, .speed button:focus-visible, .ev:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.speed { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-left: auto; }
+.speed button { background: transparent; border: 0; padding: 7px 10px; cursor: pointer; font: 500 12px/1.2 var(--f-mono); color: var(--muted); }
+.speed button[aria-pressed="true"] { background: var(--raise); color: var(--fg); }
+
+.events { display: grid; gap: 6px; }
+.ev { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; text-align: left; background: var(--raise); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; cursor: pointer; }
+.ev:hover:not(:disabled) { border-color: var(--warn); }
+.ev:disabled { opacity: 0.45; cursor: default; }
+.ev strong { font-weight: 500; }
+.ev small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.ev .rule { font: 500 11px/1 var(--f-mono); color: var(--warn); }
+.check { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.check input { margin-top: 3px; accent-color: var(--accent); }
+
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { font: 500 10px/1.2 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 6px 6px 0; border-bottom: 1px solid var(--line); }
+td { padding: 7px 6px 7px 0; border-bottom: 1px solid var(--line); font: 400 12px/1.2 var(--f-mono); white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--raise); }
+tbody tr.sel td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+td.num, th.num { text-align: right; padding-right: 10px; }
+
+.detail { margin-top: 10px; background: var(--raise); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 6px 0 0; font: 400 12px/1.35 var(--f-mono); }
+.detail dt { color: var(--muted); }
+.detail dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.detail h3 { margin: 0; font: 600 16px/1 var(--f-display); letter-spacing: 0.04em; }
+
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-height: 360px; overflow-y: auto; border-top: 1px solid var(--line); }
+.log li { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--line); border-left: 2px solid transparent; padding-left: 8px; }
+.log time { font: 400 11px/1.4 var(--f-mono); color: var(--muted); grid-row: span 2; font-variant-numeric: tabular-nums; }
+.log code { font: 500 12px/1.3 var(--f-mono); color: var(--accent); }
+.log p { margin: 0; font-size: 13px; color: var(--fg); min-width: 0; }
+.log li.ok { border-left-color: var(--ok); }
+.log li.warn { border-left-color: var(--warn); }
+.log li.bad { border-left-color: var(--bad); }
+.log li.warn code { color: var(--warn); }
+.log li.bad code { color: var(--bad); }
+.log li.ok code { color: var(--ok); }
+
+details { color: var(--muted); font-size: 13px; }
+summary { cursor: pointer; font: 600 15px/1.2 var(--f-display); letter-spacing: 0.1em; text-transform: uppercase; }
+details ul { padding-left: 18px; margin: 8px 0 0; display: grid; gap: 6px; }
+
+.fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(300px, 56%) minmax(0, 1fr); }
+  .panel { border-left: 0; border-top: 1px solid var(--line); padding-inline: 16px; }
+  .hud-card { padding: 6px 9px; }
+  .hud-card dd { font-size: 15px; }
+  .clock { font-size: 20px !important; }
+  .hint, .scale-note { display: none; }
+  h1 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+</style>
+
+<div class="app">
+  <section class="stage" id="stage" aria-label="3D view of Maple Street">
+    <canvas id="gl"></canvas>
+    <div class="labels" id="labels"></div>
+    <div class="hud">
+      <dl class="hud-card"><dt>Maple St · local time</dt><dd class="clock" id="clock">18:40:00</dd></dl>
+      <dl class="hud-card"><dt>Flood alert</dt><dd><span class="pill warn" id="alertPill">WARNING</span></dd></dl>
+      <dl class="hud-card"><dt>BOT-7 status</dt><dd id="hudStatus">delivering</dd></dl>
+      <dl class="hud-card"><dt>Battery</dt><dd><span id="hudBatt">45%</span><span class="bar"><i id="battBar"></i></span></dd></dl>
+      <dl class="hud-card"><dt>ORD-1024 · hot ramen</dt><dd id="hudOrder">in transit</dd></dl>
+    </div>
+    <p class="hint">Drag to orbit · scroll or pinch to zoom · click a segment</p>
+    <p class="scale-note">Elevation ×4 · water depth ×16 · gauge bands 0–3 / 3–8 / 8+ cm</p>
+  </section>
+
+  <aside class="panel">
+    <header>
+      <p class="eyebrow">Maple Street · moderate flash flood · rising</p>
+      <h1>BOT-7 flood run</h1>
+      <p class="lede">BOT-7 carries hot ramen from Noodle House on SEG-01 to the bookstore on SEG-04 under a flood warning. It plans each move with the semantic model's rules. Inject an event to see how it reacts.</p>
+    </header>
+
+    <div class="controls">
+      <button class="btn primary" id="play" type="button">Pause</button>
+      <button class="btn" id="restart" type="button">Restart</button>
+      <div class="speed" role="group" aria-label="Simulation speed">
+        <button type="button" data-speed="1" aria-pressed="false">1×</button>
+        <button type="button" data-speed="5" aria-pressed="true">5×</button>
+        <button type="button" data-speed="20" aria-pressed="false">20×</button>
+      </div>
+    </div>
+
+    <section>
+      <h2>Inject an event</h2>
+      <div class="events">
+        <button class="ev" type="button" id="evPower"><strong>Power line falls in the alley</strong><span class="rule">Rule 8</span><small>SEG-05 becomes impassable. BOT-7 reroutes or shelters.</small></button>
+        <button class="ev" type="button" id="evFlood4"><strong>Water reaches SEG-04</strong><span class="rule">Rule 22</span><small>The bookstore entrance is no longer dry, so the handoff point changes.</small></button>
+        <button class="ev" type="button" id="evBattery"><strong>Battery drops to 17%</strong><span class="rule">Rule 14</span><small>Below the reserve needed to reach a SafeZone plus 15%.</small></button>
+        <button class="ev" type="button" id="evEmergency"><strong>City raises alert to emergency</strong><span class="rule">Rule 18</span><small>All deliveries stop. The order is cancelled and BOT-7 shelters.</small></button>
+      </div>
+      <label class="check"><input type="checkbox" id="clogRule" checked> Treat clogged drains as hidden hazards (the expected reasoning assumes this; Rule 5 as written lists only overflowing drains)</label>
+    </section>
+
+    <section>
+      <h2>Segments</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Segment</th><th class="num">Elev</th><th class="num">Depth</th><th class="num">+5 min</th><th>Verdict</th></tr></thead>
+          <tbody id="segRows"></tbody>
+        </table>
+      </div>
+      <div class="detail" id="detail"></div>
+    </section>
+
+    <section>
+      <h2>Decision log</h2>
+      <ol class="log" id="log"></ol>
+    </section>
+
+    <details>
+      <summary>Model notes</summary>
+      <ul>
+        <li>The scenario lists no SafeZones, so this run adds two. SZ-A is a raised charging pad in the alley (capacity 2, charger). SZ-B is the Noodle House awning (capacity 1, already holding BOT-3).</li>
+        <li>The flood's 0.5 cm/min rise applies to segments already holding water (SEG-02, SEG-03, SEG-05). SEG-01 and SEG-04 stay dry unless you inject water on SEG-04.</li>
+        <li>Pedestrian density counts people on each segment: 6 or more is high. High density caps speed at 0.5 m/s and makes a segment costlier to plan through (Rule 9).</li>
+        <li>Route choice adds a cost for low elevation (Rule 6) and checks every segment's predicted depth at the moment the robot would leave it (Rule 7).</li>
+      </ul>
+    </details>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  "use strict";
+  const stage = document.getElementById("stage");
+  if (typeof THREE === "undefined") {
+    stage.insertAdjacentHTML("beforeend", '<p class="fail">The 3D library did not load. Check your connection and reload the page.</p>');
+    return;
+  }
+
+  // ---------- constants ----------
+  const VS = 4;              // elevation exaggeration
+  const DS = 4;              // extra exaggeration for water depth (total ×16)
+  const LIMIT = 8, CAUTION = 3, MAXV = 1.5;
+  const START_CLOCK = 18 * 3600 + 40 * 60;
+  const DEADLINE = 25 * 60;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const NODES = { P: [4, 3], A: [10, 3], B: [20, 0], C: [40, 0], D: [60, 0], E: [70, 3], K: [76, 3], M: [40, 18] };
+  const EDGES = [
+    { a: "P", b: "A", seg: "SEG-01", pts: [[4, 3], [10, 3]] },
+    { a: "A", b: "B", seg: "SEG-01", pts: [[10, 3], [20, 0]] },
+    { a: "B", b: "C", seg: "SEG-02", pts: [[20, 0], [40, 0]] },
+    { a: "C", b: "D", seg: "SEG-03", pts: [[40, 0], [60, 0]] },
+    { a: "D", b: "E", seg: "SEG-04", pts: [[60, 0], [70, 3]] },
+    { a: "E", b: "K", seg: "SEG-04", pts: [[70, 3], [76, 3]] },
+    { a: "A", b: "M", seg: "SEG-05", pts: [[10, 3], [10, 18], [40, 18]] },
+    { a: "M", b: "E", seg: "SEG-05", pts: [[40, 18], [70, 18], [70, 3]] },
+  ];
+  const SEG_IDS = ["SEG-01", "SEG-02", "SEG-03", "SEG-04", "SEG-05"];
+
+  function makeSegs() {
+    return {
+      "SEG-01": { type: "sidewalk", elev: 1.2, depth: 0, rate: 0, flow: 0.05, len: 20, width: 8, slope: -4, surface: "concrete", drain: null, boxes: [[0, 20, -4, 4]], note: "Noodle House block" },
+      "SEG-02": { type: "sidewalk", elev: 0.4, depth: 6, rate: 0.5, flow: 0.2, len: 20, width: 8, slope: 0, surface: "concrete", drain: { capacity: "clogged", coverPresent: true, at: [30, -1] }, boxes: [[20, 40, -4, 4]], note: "Low spot" },
+      "SEG-03": { type: "sidewalk", elev: 0.8, depth: 2, rate: 0.5, flow: 0.1, len: 20, width: 8, slope: 2, surface: "asphalt", drain: null, boxes: [[40, 60, -4, 4]], note: "" },
+      "SEG-04": { type: "sidewalk", elev: 1.0, depth: 0, rate: 0, flow: 0, len: 20, width: 8, slope: 1, surface: "brick", drain: null, boxes: [[60, 80, -4, 4]], note: "Bookstore block" },
+      "SEG-05": { type: "alley", elev: 1.1, depth: 1, rate: 0.5, flow: 0.1, len: 88, width: 4, slope: 0.5, surface: "asphalt", drain: null, boxes: [[8, 12, 4, 16], [8, 72, 16, 20], [68, 72, 4, 16]], note: "Back alley" },
+    };
+  }
+
+  // ---------- state ----------
+  let S, playing = !reduceMotion, speed = 5, clogRule = true, selected = "SEG-02";
+  let dirtyLog = true, dirtyRoute = true;
+
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  function freshState() {
+    const rnd = mulberry32(11);
+    const peds = [];
+    const colors = [0xd9b54a, 0xb8483c, 0x3f6ea8, 0x6f7f3a, 0xc9c2b5, 0x8a4f8f, 0xd07a3a];
+    for (let i = 0; i < 11; i++) {
+      const x = 19 + rnd() * 12, z = -3 + rnd() * 6.2;
+      peds.push({ x, z, tx: 1 + rnd() * 14, tz: -3.5 + rnd() * 4.3, speed: 1.2 + rnd() * 0.35, h: -Math.PI / 2, color: colors[i % colors.length], vulnerable: false });
+    }
+    peds.push({ x: 26, z: -2.2, tx: 6, tz: -2.8, speed: 0.9, h: -Math.PI / 2, color: 0x7fa0b8, vulnerable: true });
+    return {
+      t: 0,
+      segs: makeSegs(),
+      sz: [
+        { id: "SZ-A", type: "charging_station", node: "M", pos: [40, 18], cap: 2, occ: 0, charger: true, name: "Alley charging pad" },
+        { id: "SZ-B", type: "shop_awning", node: "P", pos: [1.6, 3], cap: 1, occ: 1, charger: false, name: "Noodle House awning" },
+      ],
+      peds,
+      robot: { pos: [4, 3], y: 1.2 * VS, heading: Math.PI / 2, legs: [], pi: 0, atNode: "P", status: "delivering", mode: "planning", modeUntil: 8,
+        battery: 45, goal: { kind: "deliver", node: "K" }, yielding: false, yieldSince: 0, lastCheck: 0, sz: null, moved: 0, lowBattLogged: false },
+      order: { status: "in_transit" },
+      alert: "warning",
+      hazard: null,
+      log: [],
+      used: {},
+    };
+  }
+
+  // ---------- geometry helpers ----------
+  const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  function plen(pts) { let L = 0; for (let i = 1; i < pts.length; i++) L += dist2(pts[i], pts[i - 1]); return L; }
+  function segAt(x, z) {
+    for (const id of SEG_IDS) for (const b of S.segs[id].boxes) if (x >= b[0] && x <= b[1] && z >= b[2] && z <= b[3]) return id;
+    return null;
+  }
+  function heightAt(x, z) { const id = segAt(x, z); return id ? S.segs[id].elev * VS : 0; }
+  function distPointSeg(p, a, b) {
+    const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz;
+    let t = L2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / L2 : 0; t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dz));
+  }
+  function hazardNear(pts) {
+    if (!S.hazard) return false;
+    for (let i = 1; i < pts.length; i++) if (distPointSeg(S.hazard.pos, pts[i - 1], pts[i]) < 3) return true;
+    return false;
+  }
+
+  // ---------- rules ----------
+  function drainHazard(s) {
+    if (!s.drain || s.depth <= 0) return false;
+    return !s.drain.coverPresent || s.drain.capacity === "overflowing" || (clogRule && s.drain.capacity === "clogged");
+  }
+  function assess(id, tEnter, tExit) {
+    const s = S.segs[id], reasons = [];
+    const dIn = s.depth + s.rate * tEnter / 60, dOut = s.depth + s.rate * tExit / 60;
+    if (s.blocked) reasons.push("Rule 8: downed power line");
+    if (s.depth > LIMIT) reasons.push(`Rule 1: ${s.depth.toFixed(1)} cm is over the 8 cm limit`);
+    else if (dOut > LIMIT) reasons.push(`Rule 7: will reach ${dOut.toFixed(1)} cm before BOT-7 clears it`);
+    if (s.flow > 0.5) reasons.push(`Rule 3: flow ${s.flow} m/s`);
+    if (drainHazard(s)) reasons.push(`Rule 5: ${s.drain.capacity} drain under ${s.depth.toFixed(1)} cm of water`);
+    return { ok: reasons.length === 0, reasons, caution: dIn >= CAUTION, dIn, dOut };
+  }
+  function speedOn(id, depth) {
+    let v = MAXV;
+    if (depth >= CAUTION) v = 0.5;
+    if (S.segs[id].density === "high") v = Math.min(v, 0.5);
+    return v;
+  }
+  function verdict(id) {
+    const r = assess(id, 0, 0);
+    if (!r.ok) return { tone: "bad", text: "Impassable", rule: r.reasons[0].split(":")[0] };
+    if (r.caution) return { tone: "warn", text: "Caution", rule: "Rule 2" };
+    return { tone: "ok", text: "Clear", rule: "" };
+  }
+
+  // ---------- planning ----------
+  function adj(n) {
+    return EDGES.filter(e => e.a === n || e.b === n).map(e => ({ e, to: e.a === n ? e.b : e.a, pts: e.a === n ? e.pts : e.pts.slice().reverse() }));
+  }
+  function dfs(n, goal, path, out) {
+    if (n === goal) { out.push(path.slice()); return; }
+    for (const l of adj(n)) if (!path.includes(l.to)) { path.push(l.to); dfs(l.to, goal, path, out); path.pop(); }
+  }
+  function robotStarts() {
+    const R = S.robot;
+    if (R.atNode) return [{ node: R.atNode, t: 0, legs: [] }];
+    if (!R.legs.length) {
+      const near = Object.keys(NODES).sort((a, b) => dist2(NODES[a], R.pos) - dist2(NODES[b], R.pos))[0];
+      const pts = [R.pos.slice(), NODES[near].slice()], id = segAt(...R.pos) || segAt(...NODES[near]);
+      return [{ node: near, t: plen(pts) / MAXV, legs: [{ seg: id, pts, from: null, to: near, partial: true }] }];
+    }
+    const leg = R.legs[0];
+    const fwd = [R.pos.slice(), ...leg.pts.slice(R.pi + 1)];
+    const back = [R.pos.slice(), ...leg.pts.slice(0, R.pi + 1).reverse()];
+    const s = S.segs[leg.seg], v = speedOn(leg.seg, s.depth);
+    const starts = [];
+    if (!hazardNear(fwd)) starts.push({ node: leg.to, t: plen(fwd) / v, legs: [{ seg: leg.seg, pts: fwd, from: null, to: leg.to, partial: true }] });
+    if (!hazardNear(back)) starts.push({ node: leg.from, t: plen(back) / v, legs: [{ seg: leg.seg, pts: back, from: null, to: leg.from, partial: true }] });
+    return starts;
+  }
+  function evaluate(start, nodes) {
+    let t = start.t, cost = start.t;
+    const legs = start.legs.slice();
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = nodes[i], b = nodes[i + 1], link = adj(a).find(x => x.to === b);
+      const id = link.e.seg, s = S.segs[id];
+      const v = speedOn(id, s.depth + s.rate * t / 60);
+      const tExit = t + plen(link.pts) / v;
+      const r = assess(id, t, tExit);
+      if (!r.ok) return { ok: false, nodes, start, fail: { seg: id, reasons: r.reasons } };
+      legs.push({ seg: id, pts: link.pts, from: a, to: b });
+      cost += (tExit - t) + Math.max(0, 1.2 - s.elev) * 25 + (s.density === "high" ? 90 : 0);
+      t = tExit;
+    }
+    return { ok: true, t, cost, legs, nodes, start };
+  }
+  function plan(goal) {
+    const results = [];
+    for (const st of robotStarts()) {
+      const paths = []; dfs(st.node, goal, [st.node], paths);
+      for (const p of paths) results.push(evaluate(st, p));
+    }
+    const ok = results.filter(r => r.ok).sort((a, b) => a.cost - b.cost);
+    return { best: ok[0] || null, results };
+  }
+  function segSeq(r) {
+    const out = [];
+    const push = id => { if (out[out.length - 1] !== id) out.push(id); };
+    r.start.legs.forEach(l => push(l.seg));
+    if (r.legs) r.legs.forEach(l => push(l.seg));
+    else for (let i = 0; i < r.nodes.length - 1; i++) push(adj(r.nodes[i]).find(x => x.to === r.nodes[i + 1]).e.seg);
+    if (!out.length && S.robot.atNode) push(segAt(...NODES[S.robot.atNode]) || "");
+    return out.join(" → ");
+  }
+  function routeLength(r) { return r.legs.reduce((L, l) => L + plen(l.pts), 0); }
+
+  // ---------- log ----------
+  function log(act, text, tone) {
+    S.log.unshift({ t: S.t, act, text, tone: tone || "info" });
+    if (S.log.length > 120) S.log.pop();
+    dirtyLog = true;
+  }
+  function fmtClock(sec) {
+    const s = Math.floor(START_CLOCK + sec);
+    const h = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60, ss = s % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  }
+
+  // ---------- robot behaviour ----------
+  function adopt(r) {
+    const R = S.robot;
+    R.legs = r.legs.map(l => ({ ...l, pts: l.pts.map(p => p.slice()) }));
+    R.pi = 0; R.lastCheck = S.t; dirtyRoute = true;
+    if (!R.legs.length) { arrive(); return; }
+    R.atNode = null; R.mode = "moving";
+  }
+  function logPlan(res, label) {
+    const seen = new Set();
+    const rejected = res.results.filter(r => !r.ok).filter(r => { const k = segSeq(r); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 2);
+    rejected.forEach(r => log("plan_route", `Rejected ${segSeq(r)}. ${r.fail.seg}: ${r.fail.reasons.join("; ")}.`, "warn"));
+    if (res.best) {
+      const b = res.best;
+      log("plan_route", `${label}: ${segSeq(b)}. ${routeLength(b).toFixed(0)} m, about ${(b.t / 60).toFixed(1)} min.`, "ok");
+    }
+  }
+  function startDelivery() {
+    const res = plan("K");
+    logPlan(res, "Route to the bookstore");
+    if (res.best) adopt(res.best); else noRoute();
+  }
+  function reroute(reason) {
+    log("reroute", reason, "warn");
+    const res = plan(S.robot.goal.node);
+    if (res.best) {
+      logPlan(res, "New route");
+      if (S.robot.goal.kind === "deliver") log("notify", "OperatorCenter sends the customer a new ETA.");
+      adopt(res.best);
+    } else noRoute();
+  }
+  function nearestShelter(logSkips) {
+    let best = null;
+    for (const z of S.sz) {
+      if (z.occ >= z.cap) { if (logSkips) log("seek_shelter", `Skipping ${z.id} (${z.name}): full at ${z.occ}/${z.cap}. Rule 17.`); continue; }
+      const res = plan(z.node);
+      if (res.best && (!best || res.best.cost < best.r.cost)) best = { z, r: res.best };
+    }
+    return best;
+  }
+  function seekShelter(reason) {
+    const R = S.robot;
+    log("seek_shelter", reason, "warn");
+    R.goal = { kind: "shelter", node: null };
+    const best = nearestShelter(true);
+    if (!best) { noRoute(); return; }
+    R.goal.node = best.z.node; R.sz = best.z;
+    log("plan_route", `To ${best.z.id} (${best.z.name}): ${segSeq(best.r)}, ${routeLength(best.r).toFixed(0)} m.`, "ok");
+    adopt(best.r);
+  }
+  function noRoute() {
+    const R = S.robot;
+    if (R.goal.kind === "deliver") {
+      log("plan_route", "No route to the bookstore satisfies the rules.", "bad");
+      log("notify", "OperatorCenter tells the customer the order is delayed.");
+      seekShelter("No safe route exists.");
+    } else {
+      R.mode = "stopped"; R.status = "waiting"; R.legs = []; dirtyRoute = true;
+      log("wait", "No SafeZone is reachable. Holding at the current spot, clear of the crowd's path.", "bad");
+      log("request_teleop", "Asked a human operator to take over.", "bad");
+    }
+  }
+  function arrive() {
+    const R = S.robot;
+    R.mode = "idle"; R.atNode = R.goal.node; R.legs = []; dirtyRoute = true;
+    if (R.goal.kind === "deliver") {
+      const s = S.segs["SEG-04"];
+      if (s.depth <= 0) {
+        log("arrive", "Bookstore entrance on SEG-04 is dry (0 cm), so handoff is allowed (Rule 22). Waiting for the customer.");
+      } else {
+        log("propose_alternative_dropoff", `Entrance is at ${s.depth.toFixed(1)} cm, not dry (Rule 22). Customer asked to meet on the raised bookstore step, which is dry. Customer accepts.`, "warn");
+      }
+      R.mode = "handoff"; R.modeUntil = S.t + 20; R.status = "waiting";
+    } else {
+      const z = R.sz; z.occ += 1;
+      R.mode = "sheltered"; R.status = "sheltering";
+      log("seek_shelter", `Sheltering at ${z.id} (${z.name}). Occupancy ${z.occ}/${z.cap}.`, "ok");
+      if (z.charger) log("charge", "Charging started.");
+    }
+  }
+  function completeDelivery() {
+    const R = S.robot;
+    S.order.status = "delivered";
+    log("deliver", "ORD-1024 handed to the customer. Ramen still hot.", "ok");
+    R.status = "idle";
+    if (S.alert === "warning") log("rule", "Alert is still warning: accept no new orders (Rule 18).");
+    seekShelter("Delivery done under a flood warning. Going to the nearest SafeZone.");
+  }
+  function checkBattery() {
+    const R = S.robot;
+    if (R.goal.kind !== "deliver" || S.order.status !== "in_transit") return true;
+    const best = nearestShelter(false);
+    const need = 15 + (best ? routeLength(best.r) * 0.08 : 0);
+    if (R.battery < need) {
+      log("rule", `Battery ${R.battery.toFixed(0)}% is below the ${need.toFixed(0)}% needed to reach a SafeZone plus 15% (Rule 14). Delivery paused. The order stays in the robot.`, "bad");
+      log("notify", "OperatorCenter tells the customer the order is delayed.");
+      seekShelter("Battery reserve.");
+      return false;
+    }
+    return true;
+  }
+  function validateRoute() {
+    const R = S.robot;
+    let t = 0;
+    for (let i = 0; i < R.legs.length; i++) {
+      const leg = R.legs[i];
+      const pts = i === 0 ? [R.pos, ...leg.pts.slice(R.pi + 1)] : leg.pts;
+      const s = S.segs[leg.seg];
+      const v = speedOn(leg.seg, s.depth + s.rate * t / 60);
+      const tE = t + plen(pts) / v;
+      if (hazardNear(pts)) { reroute(`Downed power line ahead on ${leg.seg} (Rule 8).`); return; }
+      const entered = i === 0 && (leg.partial || R.pi > 0 || dist2(R.pos, leg.pts[0]) > 0.05);
+      if (!entered) {
+        const r = assess(leg.seg, t, tE);
+        if (!r.ok) { reroute(`${leg.seg} no longer passes. ${r.reasons[0]}.`); return; }
+      }
+      t = tE;
+    }
+  }
+  function yieldCheck() {
+    const R = S.robot;
+    const leg = R.legs[0]; if (!leg) return null;
+    const nxt = leg.pts[R.pi + 1]; if (!nxt) return null;
+    const dx = nxt[0] - R.pos[0], dz = nxt[1] - R.pos[1], d = Math.hypot(dx, dz) || 1;
+    for (const p of S.peds) {
+      const px = p.x - R.pos[0], pz = p.z - R.pos[1], pd = Math.hypot(px, pz);
+      const ahead = (px * dx + pz * dz) / d > 0;
+      if (p.vulnerable && pd < 2.5) return "Keeping 1.5 m clear of a wheelchair user (Rule 10).";
+      if (pd < 1.8 && ahead) return "Pedestrians heading for higher ground are crossing. Yielding (Rule 9).";
+    }
+    return null;
+  }
+  function advance(distance) {
+    const R = S.robot;
+    while (distance > 1e-6 && R.legs.length) {
+      const leg = R.legs[0], target = leg.pts[R.pi + 1];
+      const dx = target[0] - R.pos[0], dz = target[1] - R.pos[1], d = Math.hypot(dx, dz);
+      if (d > 1e-6) R.heading = Math.atan2(dx, dz);
+      if (d <= distance) {
+        R.pos = target.slice(); distance -= d; R.pi++;
+        if (R.pi >= leg.pts.length - 1) {
+          R.legs.shift(); R.pi = 0; dirtyRoute = true;
+          if (!R.legs.length) { arrive(); return; }
+        }
+      } else {
+        R.pos = [R.pos[0] + dx / d * distance, R.pos[1] + dz / d * distance]; distance = 0;
+      }
+    }
+  }
+  function updateRobot(dt) {
+    const R = S.robot;
+    if (R.mode === "planning") {
+      if (S.t >= R.modeUntil) { if (checkBattery()) startDelivery(); }
+      return;
+    }
+    if (R.mode === "handoff") { if (S.t >= R.modeUntil) completeDelivery(); return; }
+    if (R.mode === "sheltered") { if (R.sz && R.sz.charger) R.battery = Math.min(100, R.battery + dt / 60 * 1.5); return; }
+    if (R.mode !== "moving") return;
+
+    if (S.t - R.lastCheck >= 2) {
+      R.lastCheck = S.t;
+      if (!checkBattery()) return;
+      validateRoute();
+      if (R.mode !== "moving") return;
+    }
+    const y = yieldCheck();
+    if (y) {
+      if (!R.yielding) { R.yielding = true; R.yieldSince = S.t; log("yield", y); }
+      R.status = "waiting";
+      if (S.t - R.yieldSince > 180 && R.status !== "stuck") { R.status = "stuck"; log("rule", "Not moved for 3 min (Rule 16). OperatorCenter alerted.", "bad"); }
+      return;
+    }
+    if (R.yielding) { R.yielding = false; log("move", "Path is clear. Moving again."); }
+    R.status = R.goal.kind === "deliver" ? "delivering" : "returning";
+    const leg = R.legs[0];
+    const s = S.segs[leg.seg];
+    let v = speedOn(leg.seg, s.depth);
+    for (const p of S.peds) if (Math.hypot(p.x - R.pos[0], p.z - R.pos[1]) < 3) { v = Math.min(v, 0.5); break; }
+    const step = v * dt;
+    advance(step);
+    R.battery = Math.max(0, R.battery - step * (s.depth >= CAUTION ? 0.1 : 0.05));
+  }
+  function updatePeds(dt) {
+    for (const p of S.peds) {
+      const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz);
+      if (d > 0.15) { const v = Math.min(d, p.speed * dt); p.x += dx / d * v; p.z += dz / d * v; p.h = Math.atan2(dx, dz); p.moving = true; }
+      else p.moving = false;
+    }
+    const counts = {}; SEG_IDS.forEach(id => counts[id] = 0);
+    for (const p of S.peds) { const id = segAt(p.x, p.z); if (id) counts[id]++; }
+    SEG_IDS.forEach(id => { const c = counts[id]; S.segs[id].density = c >= 6 ? "high" : c >= 2 ? "medium" : "low"; S.segs[id].people = c; });
+  }
+  function simulate(dt) {
+    S.t += dt;
+    for (const id of SEG_IDS) { const s = S.segs[id]; s.depth = Math.min(40, s.depth + s.rate * dt / 60); }
+    updatePeds(dt);
+    updateRobot(dt);
+  }
+
+  // ---------- events ----------
+  const evButtons = { evPower: document.getElementById("evPower"), evFlood4: document.getElementById("evFlood4"), evBattery: document.getElementById("evBattery"), evEmergency: document.getElementById("evEmergency") };
+  function useEvent(key) { S.used[key] = true; evButtons[key].disabled = true; }
+  evButtons.evPower.addEventListener("click", () => {
+    useEvent("evPower");
+    S.hazard = { pos: [55, 18] }; S.segs["SEG-05"].blocked = true;
+    log("spawn_obstacle", "A power line is down across the alley at x = 55 m.", "bad");
+    log("report_hazard", "SEG-05 marked blocked on the shared map. OperatorCenter alerted and forwards to the city (Rule 8).", "bad");
+    if (S.robot.mode === "moving") validateRoute();
+    syncHazard();
+  });
+  evButtons.evFlood4.addEventListener("click", () => {
+    useEvent("evFlood4");
+    const s = S.segs["SEG-04"]; s.rate = 0.5; s.depth = Math.max(s.depth, 0.6);
+    log("flood_rise", "Water spreads onto SEG-04 and starts rising at 0.5 cm/min.", "warn");
+  });
+  evButtons.evBattery.addEventListener("click", () => {
+    useEvent("evBattery");
+    S.robot.battery = 17;
+    log("battery", "Battery reading drops to 17% (cold cells).", "warn");
+    if (S.robot.mode === "moving") checkBattery();
+  });
+  evButtons.evEmergency.addEventListener("click", () => {
+    useEvent("evEmergency");
+    S.alert = "emergency";
+    log("raise_alert", "City raises the flood alert to emergency.", "bad");
+    const R = S.robot;
+    if (S.order.status === "in_transit") {
+      S.order.status = "cancelled";
+      log("cancel_or_return", "ORD-1024 cancelled (Rule 18). OperatorCenter notifies and refunds the customer.", "bad");
+    }
+    if (R.mode !== "sheltered" && !(R.goal.kind === "shelter" && R.mode === "moving")) {
+      R.mode = "idle";
+      seekShelter("Emergency alert: stop all deliveries (Rule 18).");
+    }
+  });
+  const clogBox = document.getElementById("clogRule");
+  clogBox.addEventListener("change", () => {
+    clogRule = clogBox.checked;
+    log("rule", clogRule ? "Clogged drains now count as hidden hazards under Rule 5." : "Rule 5 now applies as written: only overflowing drains or missing covers.");
+    if (S.robot.mode === "moving") validateRoute();
+  });
+
+  // ---------- three.js scene ----------
+  const canvas = document.getElementById("gl");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d141c);
+  scene.fog = new THREE.Fog(0x0d141c, 110, 230);
+  // The model's x axis runs west to east. Mirror it so the street reads left to right from the south-side camera.
+  const world = new THREE.Group(); world.scale.x = -1; scene.add(world);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 600);
+  camera.position.set(-40, 78, -30);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.target.set(-40, 0, 8);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = 1.45;
+  controls.minDistance = 12;
+  controls.maxDistance = 160;
+  controls.update();
+
+  world.add(new THREE.HemisphereLight(0x9fbfe0, 0x1a1612, 0.8));
+  const moon = new THREE.DirectionalLight(0xcfe3ff, 0.55); moon.position.set(-30, 60, -40); world.add(moon);
+  const lamp1 = new THREE.PointLight(0xffc27a, 0.9, 40); lamp1.position.set(14, 12, -5); world.add(lamp1);
+  const lamp2 = new THREE.PointLight(0xffc27a, 0.9, 40); lamp2.position.set(62, 12, -5); world.add(lamp2);
+
+  const lambert = c => new THREE.MeshLambertMaterial({ color: c });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 240), lambert(0x101a23));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(40, 0, 10); world.add(ground);
+
+  // lamp posts
+  [[14, -5], [62, -5]].forEach(([x, z]) => {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 12, 8), lambert(0x2a3644)); pole.position.set(x, 6, z); world.add(pole);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffd9a0 })); bulb.position.set(x, 12, z); world.add(bulb);
+  });
+
+  const init = makeSegs();
+  const slabMeshes = {}, waterMeshes = {};
+  const slabColor = { "SEG-01": 0x4d5b69, "SEG-02": 0x434f5c, "SEG-03": 0x3b4450, "SEG-04": 0x5a4d4a, "SEG-05": 0x463f3c };
+  const waterMat = new THREE.MeshPhongMaterial({ color: 0x3a9cc4, transparent: true, opacity: 0.55, shininess: 90, specular: 0x9fd4ff, depthWrite: false });
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x2c4054 });
+  SEG_IDS.forEach(id => {
+    const s = init[id], h = s.elev * VS;
+    slabMeshes[id] = []; waterMeshes[id] = [];
+    s.boxes.forEach(b => {
+      const w = b[1] - b[0], d = b[3] - b[2];
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mat = new THREE.MeshLambertMaterial({ color: slabColor[id], emissive: 0x000000 });
+      const m = new THREE.Mesh(geo, mat); m.position.set(b[0] + w / 2, h / 2, b[2] + d / 2); m.userData.seg = id;
+      world.add(m); slabMeshes[id].push(m);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); edges.position.copy(m.position); world.add(edges);
+      const wm = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), waterMat); wm.userData = { box: b, top: h }; wm.renderOrder = 2;
+      world.add(wm); waterMeshes[id].push(wm);
+    });
+    if (s.type !== "alley") {
+      const b = s.boxes[0];
+      for (let x = b[0] + 1.5; x < b[1] - 1; x += 4) {
+        const dash = new THREE.Mesh(new THREE.BoxGeometry(2, 0.03, 0.18), new THREE.MeshBasicMaterial({ color: 0x8c8a73 }));
+        dash.position.set(x + 1, h + 0.02, -1.6); world.add(dash);
+      }
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(b[1] - b[0], 0.05, 0.12), new THREE.MeshBasicMaterial({ color: 0x6d7a86 }));
+      curb.position.set((b[0] + b[1]) / 2, h + 0.03, 1.2); world.add(curb);
+    }
+  });
+
+  // depth gauges (staff gauges with 0-3 / 3-8 / 8-12 cm bands)
+  const GU = 0.01 * DS * VS;
+  function addGauge(x, z, id) {
+    const base = init[id].elev * VS;
+    [[0, 3, 0x5fd38d], [3, 8, 0xf0b040], [8, 12, 0xff6b5e]].forEach(([a, b, c]) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, (b - a) * GU, 10), new THREE.MeshBasicMaterial({ color: c }));
+      m.position.set(x, base + (a + b) / 2 * GU, z); world.add(m);
+    });
+  }
+  addGauge(3, -4.4, "SEG-01"); addGauge(23, -4.4, "SEG-02"); addGauge(43, -4.4, "SEG-03"); addGauge(63, -4.4, "SEG-04"); addGauge(24, 20.4, "SEG-05");
+
+  // clogged drain
+  const drainTop = init["SEG-02"].elev * VS;
+  const grate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 1.3), lambert(0x15191d)); grate.position.set(30, drainTop + 0.03, -1); world.add(grate);
+  const drainRing = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.25, 40), new THREE.MeshBasicMaterial({ color: 0xff6b5e, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+  drainRing.rotation.x = -Math.PI / 2; drainRing.position.set(30, drainTop + 0.1, -1); world.add(drainRing);
+
+  // buildings
+  const shops = [
+    { name: "Noodle House", x0: 0, x1: 7, seg: "SEG-01", h: 6, color: 0x3d4958, awning: 0xc8553d },
+    { name: "Harbor Pharmacy", x0: 13, x1: 26, seg: "SEG-02", h: 7, color: 0x34404d },
+    { name: "Corner Grocer", x0: 27, x1: 40, seg: "SEG-02", h: 6, color: 0x3a3f4a },
+    { name: "Tailor & Repair", x0: 41, x1: 54, seg: "SEG-03", h: 7, color: 0x323c47 },
+    { name: "Print Shop", x0: 55, x1: 67, seg: "SEG-03", h: 6, color: 0x3b4552 },
+    { name: "Bookstore", x0: 73, x1: 80, seg: "SEG-04", h: 6.5, color: 0x3a4654, awning: 0x3d7cc8 },
+  ];
+  const wrnd = mulberry32(3);
+  const litMat = new THREE.MeshBasicMaterial({ color: 0xffd28a }), darkMat = new THREE.MeshBasicMaterial({ color: 0x1b2632 });
+  shops.forEach(sh => {
+    const base = init[sh.seg].elev * VS, H = base + sh.h, w = sh.x1 - sh.x0;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, 9), lambert(sh.color)); m.position.set(sh.x0 + w / 2, H / 2, 9.5); world.add(m);
+    for (let x = sh.x0 + 1.5; x < sh.x1 - 1; x += 2.6) for (let y = base + 4.4; y < H - 0.6; y += 2.2) {
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.2), wrnd() < 0.45 ? litMat : darkMat);
+      win.position.set(x + 0.7, y, 4.98); win.rotation.y = Math.PI; world.add(win);
+    }
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(3, w - 2), 2.6), new THREE.MeshBasicMaterial({ color: 0xe9c48a }));
+    door.position.set(sh.x0 + w / 2, base + 1.3, 4.97); door.rotation.y = Math.PI; world.add(door);
+    if (sh.awning) {
+      const aw = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.2, 2.2), lambert(sh.awning)); aw.position.set(sh.x0 + w / 2, base + 3.4, 4); world.add(aw);
+    }
+    sh.labelPos = new THREE.Vector3(sh.x0 + w / 2, H + 1, 7);
+  });
+  // backdrop row behind the alley
+  for (let x = -6; x < 90; x += 12) {
+    const h = 14 + wrnd() * 16;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(11, h, 10), lambert(0x1c2733)); m.position.set(x + 5.5, h / 2, 27); world.add(m);
+  }
+
+  // safe zones
+  const szPad = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.3, 3.4), lambert(0x2d5e48)); szPad.position.set(40, init["SEG-05"].elev * VS + 0.15, 18); world.add(szPad);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 14, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x5fd38d, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }));
+  beam.position.set(40, init["SEG-05"].elev * VS + 7, 18); world.add(beam);
+  const szB = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.2, 32), new THREE.MeshBasicMaterial({ color: 0x5fd38d, side: THREE.DoubleSide }));
+  szB.rotation.x = -Math.PI / 2; szB.position.set(1.6, init["SEG-01"].elev * VS + 0.04, 3); world.add(szB);
+
+  // robots
+  function makeBot(bodyColor, beaconColor) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.7, 1.3), lambert(bodyColor)); body.position.y = 0.55; g.add(body);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.12, 1.32), lambert(0x22303e)); lid.position.y = 0.95; g.add(lid);
+    const wheelGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.14, 12), wheelMat = lambert(0x111418);
+    [-0.45, 0, 0.45].forEach(z => [-0.55, 0.55].forEach(x => { const w = new THREE.Mesh(wheelGeo, wheelMat); w.rotation.z = Math.PI / 2; w.position.set(x, 0.2, z); g.add(w); }));
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.8, 6), lambert(0xdddddd)); pole.position.set(-0.35, 1.9, -0.5); g.add(pole);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32), new THREE.MeshBasicMaterial({ color: 0xff8a3d, side: THREE.DoubleSide })); flag.position.set(-0.35, 2.6, -0.25); flag.rotation.y = Math.PI / 2; g.add(flag);
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshBasicMaterial({ color: beaconColor })); beacon.position.set(0.3, 1.1, 0.45); g.add(beacon);
+    g.userData.beacon = beacon;
+    g.scale.setScalar(1.35);
+    return g;
+  }
+  const bot = makeBot(0xe8eef2, 0x9fd4ff); world.add(bot);
+  const bot3 = makeBot(0x8995a1, 0x445566); bot3.position.set(1.6, init["SEG-01"].elev * VS, 3); bot3.rotation.y = Math.PI / 2; world.add(bot3);
+
+  // pedestrians
+  const pedMeshes = [];
+  function buildPeds() {
+    pedMeshes.forEach(m => scene.remove(m)); pedMeshes.length = 0;
+    S.peds.forEach(p => {
+      const g = new THREE.Group();
+      if (p.vulnerable) {
+        const chair = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.7), lambert(0x2b3540)); chair.position.y = 0.55; g.add(chair);
+        [-0.4, 0.4].forEach(x => { const w = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.05, 6, 16), lambert(0x9aa7b3)); w.rotation.y = Math.PI / 2; w.position.set(x, 0.35, 0); g.add(w); });
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.75, 10), lambert(p.color)); torso.position.y = 1.15; g.add(torso);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), lambert(0xd8b49a)); head.position.y = 1.7; g.add(head);
+      } else {
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 1.25, 10), lambert(p.color)); torso.position.y = 0.65; g.add(torso);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), lambert(0xd8b49a)); head.position.y = 1.45; g.add(head);
+      }
+      g.scale.setScalar(1.3);
+      world.add(g); pedMeshes.push(g);
+    });
+  }
+
+  // power-line hazard
+  const hazardGroup = new THREE.Group();
+  (function () {
+    const top = init["SEG-05"].elev * VS;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 11, 8), lambert(0x5a4632));
+    pole.position.set(55, top + 4.6, 22); pole.rotation.x = -0.45; hazardGroup.add(pole);
+    const pts = [new THREE.Vector3(55, top + 9.4, 24.2), new THREE.Vector3(54, top + 3, 20), new THREE.Vector3(55.5, top + 0.15, 17.2), new THREE.Vector3(57, top + 0.15, 16.4)];
+    const wire = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x111111 }));
+    hazardGroup.add(wire);
+    const spark = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
+    spark.position.set(55.5, top + 0.4, 17.2); hazardGroup.add(spark); hazardGroup.userData.spark = spark;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.7, 3.0, 40), new THREE.MeshBasicMaterial({ color: 0xff6b5e, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(55, top + 0.05, 18); hazardGroup.add(ring);
+  })();
+  world.add(hazardGroup);
+  function syncHazard() { hazardGroup.visible = !!S.hazard; }
+
+  // route line
+  let routeLine = null;
+  const routeMat = new THREE.LineDashedMaterial({ color: 0x9fd4ff, dashSize: 0.8, gapSize: 0.5 });
+  function rebuildRoute() {
+    if (routeLine) { scene.remove(routeLine); routeLine.geometry.dispose(); routeLine = null; }
+    const R = S.robot; if (!R.legs.length) return;
+    const pts = [R.pos.slice()];
+    R.legs.forEach((l, i) => (i === 0 ? l.pts.slice(R.pi + 1) : l.pts.slice(1)).forEach(p => pts.push(p)));
+    const v = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (i > 0) { // sample along so the line follows slab heights
+        const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(dist2(a, b) / 1.5));
+        for (let k = 1; k <= n; k++) { const x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n; v.push(new THREE.Vector3(x, heightAt(x, z) + 0.35, z)); }
+      } else v.push(new THREE.Vector3(pts[0][0], heightAt(pts[0][0], pts[0][1]) + 0.35, pts[0][1]));
+    }
+    routeLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(v), routeMat);
+    routeLine.computeLineDistances(); world.add(routeLine);
+  }
+
+  // rain
+  const RAIN = 2600, rainPos = new Float32Array(RAIN * 3), rr = mulberry32(5);
+  for (let i = 0; i < RAIN; i++) { rainPos[i * 3] = -20 + rr() * 120; rainPos[i * 3 + 1] = rr() * 45; rainPos[i * 3 + 2] = -25 + rr() * 60; }
+  const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+  const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0x9fc6e0, size: 0.16, transparent: true, opacity: 0.55, depthWrite: false }));
+  rain.visible = !reduceMotion; world.add(rain);
+
+  // ---------- HTML labels ----------
+  const labelLayer = document.getElementById("labels");
+  const labels = [];
+  function addLabel(cls, getPos, onClick) {
+    const el = document.createElement("div"); el.className = "tag " + cls; labelLayer.appendChild(el);
+    if (onClick) el.addEventListener("click", onClick);
+    const L = { el, getPos, html: "" }; labels.push(L); return L;
+  }
+  const segLabelPos = { "SEG-01": [10, -3], "SEG-02": [30, -3], "SEG-03": [50, -3], "SEG-04": [70, -3], "SEG-05": [26, 18] };
+  const segLabels = {};
+  SEG_IDS.forEach(id => {
+    const [x, z] = segLabelPos[id];
+    segLabels[id] = addLabel("seg", () => new THREE.Vector3(x, init[id].elev * VS + 1.6 + S.segs[id].depth * GU, z), () => select(id));
+  });
+  const botLabel = addLabel("robot", () => new THREE.Vector3(bot.position.x, bot.position.y + 4.2, bot.position.z));
+  shops.filter(s => s.name === "Noodle House" || s.name === "Bookstore").forEach(sh => { const l = addLabel("place", () => sh.labelPos); l.el.textContent = sh.name === "Bookstore" ? "Bookstore · customer" : "Noodle House · pickup"; });
+  const szALabel = addLabel("place", () => new THREE.Vector3(40, init["SEG-05"].elev * VS + 4, 18));
+  const szBLabel = addLabel("place", () => new THREE.Vector3(1.6, init["SEG-01"].elev * VS + 4.6, 3));
+  const drainLabel = addLabel("hazard", () => new THREE.Vector3(30, drainTop + 1.4 + S.segs["SEG-02"].depth * GU, -1)); drainLabel.el.textContent = "Clogged drain";
+  const powerLabel = addLabel("hazard", () => new THREE.Vector3(55, init["SEG-05"].elev * VS + 3, 18)); powerLabel.el.textContent = "Downed power line";
+
+  const vec = new THREE.Vector3();
+  function placeLabels(w, h) {
+    labels.forEach(L => {
+      if (L === powerLabel && !S.hazard) { L.el.style.display = "none"; return; }
+      vec.copy(L.getPos()); vec.x = -vec.x; vec.project(camera);
+      if (vec.z > 1 || vec.x < -1.2 || vec.x > 1.2 || vec.y < -1.2 || vec.y > 1.2) { L.el.style.display = "none"; return; }
+      L.el.style.display = "";
+      L.el.style.transform = `translate(${((vec.x + 1) / 2 * w).toFixed(1)}px, ${((1 - vec.y) / 2 * h).toFixed(1)}px) translate(-50%, -100%)`;
+    });
+  }
+
+  // ---------- panel rendering ----------
+  const rowsEl = document.getElementById("segRows"), detailEl = document.getElementById("detail"), logEl = document.getElementById("log");
+  function select(id) { selected = id; renderTable(); }
+  rowsEl.addEventListener("click", e => { const tr = e.target.closest("tr[data-seg]"); if (tr) select(tr.dataset.seg); });
+  function renderTable() {
+    rowsEl.innerHTML = SEG_IDS.map(id => {
+      const s = S.segs[id], v = verdict(id), p5 = s.depth + s.rate * 5;
+      return `<tr data-seg="${id}" class="${id === selected ? "sel" : ""}"><td>${id}</td><td class="num">${s.elev.toFixed(1)} m</td><td class="num">${s.depth.toFixed(1)}</td><td class="num">${p5.toFixed(1)}</td><td><span class="pill ${v.tone}">${v.text}${v.rule ? " · " + v.rule.replace("Rule ", "R") : ""}</span></td></tr>`;
+    }).join("");
+    const s = S.segs[selected], r = assess(selected, 0, 0);
+    const drain = s.drain ? `${s.drain.capacity}, cover ${s.drain.coverPresent ? "present" : "missing"}` : "none";
+    detailEl.innerHTML = `<h3>${selected} · ${s.type}${s.note ? " · " + s.note : ""}</h3><dl>
+      <dt>length × width</dt><dd>${s.len} m × ${s.width} m</dd>
+      <dt>elevation / slope</dt><dd>${s.elev.toFixed(1)} m / ${s.slope}%</dd>
+      <dt>surface</dt><dd>${s.surface}</dd>
+      <dt>waterDepth</dt><dd>${s.depth.toFixed(1)} cm, ${s.rate ? "rising " + s.rate + " cm/min" : "steady"}</dd>
+      <dt>waterFlowSpeed</dt><dd>${s.flow} m/s</dd>
+      <dt>drainage inlet</dt><dd>${drain}</dd>
+      <dt>pedestrians</dt><dd>${s.people || 0} (${s.density || "low"})</dd>
+      <dt>isBlocked</dt><dd>${s.blocked ? "true (power line)" : "false"}</dd>
+      <dt>rule check</dt><dd>${r.ok ? (r.caution ? "passable at ≤ 0.5 m/s (Rule 2)" : "passable") : r.reasons.join("; ")}</dd></dl>`;
+    SEG_IDS.forEach(id => slabMeshes[id].forEach(m => m.material.emissive.setHex(id === selected ? 0x1d3a55 : 0x000000)));
+  }
+  function renderLog() {
+    logEl.innerHTML = S.log.map(e => `<li class="${e.tone}"><time>${fmtClock(e.t)}</time><code>${e.act}</code><p>${e.text}</p></li>`).join("");
+    dirtyLog = false;
+  }
+  const clockEl = document.getElementById("clock"), alertEl = document.getElementById("alertPill"), statusEl = document.getElementById("hudStatus"),
+    battEl = document.getElementById("hudBatt"), battBar = document.getElementById("battBar"), orderEl = document.getElementById("hudOrder");
+  function renderHud() {
+    clockEl.textContent = fmtClock(S.t);
+    alertEl.textContent = S.alert.toUpperCase(); alertEl.className = "pill " + (S.alert === "emergency" ? "bad" : "warn");
+    const R = S.robot;
+    statusEl.textContent = R.mode === "planning" ? "delivering · planning" : R.status;
+    battEl.textContent = R.battery.toFixed(0) + "%";
+    battBar.style.width = R.battery + "%";
+    battBar.style.background = R.battery < 20 ? "var(--bad)" : R.battery < 35 ? "var(--warn)" : "var(--ok)";
+    const left = DEADLINE - S.t;
+    const leftTxt = left > 0 ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")} left` : "past deadline";
+    orderEl.textContent = S.order.status === "in_transit" ? `in transit · due 19:05 · ${leftTxt}` : S.order.status;
+    botLabel.el.innerHTML = `<b>BOT-7</b> · ${statusEl.textContent}`;
+    const a = S.sz[0], b = S.sz[1];
+    szALabel.el.textContent = `${a.id} charging pad · ${a.occ}/${a.cap}`;
+    szBLabel.el.textContent = `${b.id} awning · ${b.occ}/${b.cap} full`;
+    SEG_IDS.forEach(id => {
+      const v = verdict(id), s = S.segs[id];
+      segLabels[id].el.className = `tag seg ${v.tone}${id === selected ? " sel" : ""}`;
+      segLabels[id].el.innerHTML = `${id} · ${s.depth.toFixed(1)} cm`;
+    });
+  }
+
+  // ---------- frame loop ----------
+  function syncWorld(realDt, now) {
+    SEG_IDS.forEach(id => {
+      const d = S.segs[id].depth;
+      waterMeshes[id].forEach(wm => {
+        const b = wm.userData.box, hv = d * GU;
+        wm.visible = d > 0.05;
+        wm.scale.set(b[1] - b[0] - 0.06, Math.max(0.01, hv), b[3] - b[2] - 0.06);
+        wm.position.set((b[0] + b[1]) / 2, wm.userData.top + hv / 2, (b[2] + b[3]) / 2);
+      });
+    });
+    drainRing.position.y = drainTop + S.segs["SEG-02"].depth * GU + 0.03;
+    drainRing.material.opacity = reduceMotion ? 0.9 : 0.55 + 0.4 * Math.abs(Math.sin(now / 400));
+    const R = S.robot;
+    const ty = heightAt(R.pos[0], R.pos[1]);
+    bot.position.x = R.pos[0]; bot.position.z = R.pos[1];
+    bot.position.y += (ty - bot.position.y) * Math.min(1, realDt * 10);
+    let dh = R.heading - bot.rotation.y; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+    bot.rotation.y += dh * Math.min(1, realDt * 8);
+    bot.userData.beacon.material.color.setHex(R.status === "waiting" || R.status === "stuck" ? 0xf0b040 : R.status === "sheltering" ? 0x5fd38d : 0x9fd4ff);
+    S.peds.forEach((p, i) => {
+      const m = pedMeshes[i]; if (!m) return;
+      m.position.set(p.x, heightAt(p.x, p.z), p.z); m.rotation.y = p.h;
+    });
+    if (S.hazard && hazardGroup.userData.spark) hazardGroup.userData.spark.visible = reduceMotion || Math.sin(now / 70) > -0.2;
+    if (rain.visible) {
+      const arr = rainGeo.attributes.position.array;
+      for (let i = 0; i < RAIN; i++) { arr[i * 3 + 1] -= realDt * 32; if (arr[i * 3 + 1] < 0) arr[i * 3 + 1] += 45; }
+      rainGeo.attributes.position.needsUpdate = true;
+    }
+  }
+
+  let last = performance.now(), panelTimer = 0, routeTimer = 0;
+  function frame(now) {
+    const realDt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (playing) {
+      let simDt = realDt * speed;
+      while (simDt > 0) { const h = Math.min(0.2, simDt); simulate(h); simDt -= h; }
+    }
+    syncWorld(realDt, now);
+    controls.update();
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.render(scene, camera);
+    placeLabels(w, h);
+    renderHud();
+    panelTimer += realDt; routeTimer += realDt;
+    if (panelTimer > 0.3) { panelTimer = 0; renderTable(); }
+    if (dirtyLog) renderLog();
+    if (dirtyRoute || routeTimer > 0.4) { routeTimer = 0; dirtyRoute = false; rebuildRoute(); }
+    requestAnimationFrame(frame);
+  }
+
+  let framed = false;
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+    if (!framed && w > 0) { // pull back on narrow screens so the whole 80 m street fits
+      framed = true;
+      const k = Math.max(1, 1.5 / camera.aspect);
+      camera.position.set(-40, 78 * k, 8 - 38 * k); controls.update();
+    }
+  }
+  new ResizeObserver(resize).observe(stage);
+
+  // click to select a segment (ignore drags)
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let downAt = null;
+  canvas.addEventListener("pointerdown", e => { downAt = [e.clientX, e.clientY]; });
+  canvas.addEventListener("pointerup", e => {
+    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+    const r = canvas.getBoundingClientRect();
+    ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(SEG_IDS.flatMap(id => slabMeshes[id]));
+    if (hits.length) select(hits[0].object.userData.seg);
+  });
+
+  // controls
+  const playBtn = document.getElementById("play");
+  function syncPlay() { playBtn.textContent = playing ? "Pause" : "Play"; }
+  playBtn.addEventListener("click", () => { playing = !playing; syncPlay(); });
+  document.querySelectorAll(".speed button").forEach(b => b.addEventListener("click", () => {
+    speed = +b.dataset.speed;
+    document.querySelectorAll(".speed button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  }));
+  function restart() {
+    S = freshState();
+    Object.values(evButtons).forEach(b => b.disabled = false);
+    buildPeds(); syncHazard();
+    bot.position.set(4, 1.2 * VS, 3); bot.rotation.y = Math.PI / 2;
+    log("sense_water", "SEG-01 is dry. SEG-02 ahead is at 6 cm, rising 0.5 cm/min, with a clogged drain.");
+    log("check_alert", "Flood alert is warning: finish the current order, accept no new ones (Rule 18).");
+    log("pick_up", "ORD-1024 (hot ramen, perishable, due 19:05) is loaded at Noodle House.", "ok");
+    dirtyLog = true; dirtyRoute = true; renderTable();
+  }
+  document.getElementById("restart").addEventListener("click", restart);
+
+  restart(); syncPlay(); resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
