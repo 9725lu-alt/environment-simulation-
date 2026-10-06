@@ -1,263 +1,358 @@
-<title>L2 Entrance Footfall</title>
+<title>L2 出入口客流</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
 <style>
-/* Layout: single reading column (~72ch), charts full column width, tiers as a three-row ledger */
+/* 版式：单栏阅读（约 760px），首屏是一条按客流着色的“热力条”，下面依次是排名、楼层/分区、分档建议、数据表 */
 :root {
-  --bg: #f6f7f8;
+  --bg: #f4f5f6;
   --surface: #ffffff;
-  --ink: #14181c;
-  --ink-2: #4b535b;
-  --ink-3: #79818a;
-  --rule: #dde1e5;
-  --track: #eef0f2;
-  --s-conn: #2a78d6;   /* connection / link passage */
-  --s-vert: #eb6834;   /* escalator / lift lobby */
-  --hot: #b4441b;
-  --font-display: "Archivo", "Noto Sans SC", system-ui, sans-serif;
-  --font-body: "Noto Sans SC", system-ui, -apple-system, "PingFang SC", sans-serif;
+  --ink: #15191d;
+  --ink-2: #4a525a;
+  --ink-3: #7c848c;
+  --rule: #dfe2e6;
+  --track: #eceef1;
+  /* 热力色阶：客流越大越“热” */
+  --h1: #fbe3d4; --h2: #f6bd98; --h3: #ee935f; --h4: #e06a33; --h5: #c2501f; --h6: #93380f;
+  --cool: #5d7f9e;
+  --on-hot: #ffffff;
+  --font-display: "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Noto Sans SC", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #121416; --surface: #1a1d20; --ink: #f2f4f5; --ink-2: #c0c6cc; --ink-3: #8b939b;
-    --rule: #2e3338; --track: #24282c; --s-conn: #3987e5; --s-vert: #d95926; --hot: #f08a5d;
+    --bg: #111315; --surface: #191c1f; --ink: #f1f3f4; --ink-2: #bfc5cb; --ink-3: #8a929a;
+    --rule: #2c3136; --track: #23272b;
+    --h1: #4a2a1c; --h2: #6f3820; --h3: #9a4723; --h4: #c85a28; --h5: #e2763f; --h6: #f39a64;
+    --cool: #86a6c4; --on-hot: #ffffff;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #121416; --surface: #1a1d20; --ink: #f2f4f5; --ink-2: #c0c6cc; --ink-3: #8b939b;
-  --rule: #2e3338; --track: #24282c; --s-conn: #3987e5; --s-vert: #d95926; --hot: #f08a5d;
+  --bg: #111315; --surface: #191c1f; --ink: #f1f3f4; --ink-2: #bfc5cb; --ink-3: #8a929a;
+  --rule: #2c3136; --track: #23272b;
+  --h1: #4a2a1c; --h2: #6f3820; --h3: #9a4723; --h4: #c85a28; --h5: #e2763f; --h6: #f39a64;
+  --cool: #86a6c4; --on-hot: #ffffff;
   color-scheme: dark;
 }
-body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
-.wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 40px; }
-h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
-h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; line-height: 1.1; }
-h2 { font-size: 21px; font-weight: 700; }
-p { margin: 0; max-width: 68ch; }
-.eyebrow { font-family: var(--font-data); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.75; }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 48px 72px; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 6vw, 44px); font-weight: 900; line-height: 1.25; letter-spacing: .01em; }
+h2 { font-size: 23px; font-weight: 600; line-height: 1.4; }
+p { margin: 0; max-width: 40em; }
+.eyebrow { font-family: var(--font-data); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; gap: 10px; }
+.eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
 .lede { color: var(--ink-2); font-size: 16.5px; }
-section { display: grid; gap: 14px; min-width: 0; }
+section { display: grid; gap: 16px; min-width: 0; }
 .num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 strong { font-weight: 700; }
+.hl { color: var(--h5); }
 
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
-.fact { background: var(--surface); padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
-.fact .v { font-family: var(--font-data); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.fact .l { color: var(--ink-2); font-size: 13px; line-height: 1.4; }
+/* 首屏热力条 */
+.hero { display: grid; gap: 22px; }
+.heat { display: grid; gap: 10px; }
+.heatbar { display: flex; gap: 2px; height: 64px; border-radius: 6px; overflow: hidden; }
+.heatbar div { display: flex; flex-direction: column; justify-content: flex-end; padding: 6px 7px; color: var(--on-hot); font-size: 11.5px; line-height: 1.3; min-width: 0; overflow: hidden; white-space: nowrap; cursor: default; }
+.heatbar div .num { font-weight: 700; font-size: 13px; }
+.heatbar div:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.heatscale { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); }
+.brace { display: flex; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+.brace span { border-top: 2px solid var(--h5); padding-top: 6px; flex: 1; white-space: nowrap; }
+.brace span + span { flex: 0 0 auto; border-top-color: var(--rule); color: var(--ink-3); text-align: right; }
 
-.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 16px 12px; display: grid; gap: 10px; position: relative; min-width: 0; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.rows { display: grid; gap: 6px; }
-.row { display: grid; grid-template-columns: minmax(0, 15em) minmax(0, 1fr); gap: 12px; align-items: center; padding: 3px 4px; border-radius: 4px; cursor: default; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.fact { display: grid; gap: 2px; align-content: start; border-left: 2px solid var(--rule); padding-left: 12px; }
+.fact .v { font-family: var(--font-data); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.fact .v small { font-size: 15px; font-weight: 600; }
+.fact .l { color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+.fact.key { border-left-color: var(--h5); }
+.fact.key .v { color: var(--h5); }
+
+/* 图表卡片 */
+.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 18px 18px 14px; display: grid; gap: 12px; position: relative; min-width: 0; }
+.rows { display: grid; gap: 4px; }
+.row { display: grid; grid-template-columns: minmax(0, 13.5em) minmax(0, 1fr); gap: 14px; align-items: center; padding: 5px 6px; border-radius: 5px; cursor: default; }
 .row:hover, .row:focus-visible { background: var(--track); outline: none; }
-.row .name { font-size: 13px; line-height: 1.3; display: grid; }
-.row .name small { color: var(--ink-3); font-size: 11.5px; }
-.bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.bar b { height: 18px; border-radius: 0 4px 4px 0; display: block; min-width: 2px; }
+.row .name { display: grid; line-height: 1.35; }
+.row .name span { font-size: 14px; font-weight: 500; }
+.row .name small { font-size: 11.5px; color: var(--ink-3); }
+.chip { display: inline-block; font-size: 10.5px; line-height: 1.6; padding: 0 6px; border-radius: 3px; border: 1px solid var(--rule); color: var(--ink-2); margin-left: 6px; vertical-align: 1px; font-weight: 400; }
+.chip.in { border-color: var(--cool); color: var(--cool); }
+.bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bar b { height: 20px; border-radius: 0 4px 4px 0; display: block; min-width: 2px; }
 .bar .val { font-family: var(--font-data); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.axisnote { font-size: 12px; color: var(--ink-3); }
-.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; line-height: 1.45; padding: 8px 10px; border-radius: 5px; max-width: 260px; z-index: 2; }
-.tip .num { color: inherit; }
+.bar .val em { font-style: normal; color: var(--ink); font-weight: 600; }
+.divider { border-top: 1px dashed var(--rule); margin: 6px 6px; position: relative; }
+.divider span { position: absolute; right: 0; top: -10px; background: var(--surface); padding-left: 8px; font-size: 11.5px; color: var(--ink-3); }
+.note { font-size: 12px; color: var(--ink-3); line-height: 1.6; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; line-height: 1.6; padding: 9px 11px; border-radius: 6px; max-width: 250px; z-index: 3; box-shadow: 0 6px 20px rgb(0 0 0 / .18); }
 
-.zones { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; height: 44px; border-radius: 4px; overflow: hidden; }
-.zones div { background: var(--s-conn); color: #fff; font-family: var(--font-data); font-size: 12px; display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; }
+/* 楼层 + 分区 */
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.pair .chart h3 { font-family: var(--font-body); font-size: 14px; font-weight: 700; }
+.strip { display: grid; gap: 7px; }
+.srow { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) 4em; gap: 10px; align-items: center; font-size: 13px; }
+.srow .lab { color: var(--ink-2); font-family: var(--font-data); }
+.srow .trk { background: var(--track); border-radius: 0 4px 4px 0; height: 14px; }
+.srow .trk b { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--ink-3); }
+.srow.on .lab, .srow.on .pv { color: var(--ink); font-weight: 700; }
+.srow.on .trk b { background: var(--h5); }
+.srow .pv { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; color: var(--ink-2); }
 
-.tiers { display: grid; border-top: 1px solid var(--rule); }
-.tier { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--rule); }
-.tier .tag { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
-.tier .tag small { display: block; font-family: var(--font-data); font-weight: 400; font-size: 12px; color: var(--ink-3); }
-.tier .body { display: grid; gap: 6px; min-width: 0; }
-.tier.t1 .tag { color: var(--hot); }
-ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
-li { max-width: 68ch; }
+/* 分档 */
+.tiers { display: grid; gap: 14px; }
+.tier { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 18px; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 18px; }
+.tier.t1 { border-color: var(--h4); box-shadow: inset 4px 0 0 var(--h4); }
+.tier .tag { display: grid; align-content: start; gap: 2px; }
+.tier .tag b { font-family: var(--font-display); font-size: 22px; font-weight: 900; line-height: 1.2; }
+.tier.t1 .tag b { color: var(--h5); }
+.tier .tag small { font-family: var(--font-data); font-size: 12px; color: var(--ink-3); }
+.tier .body { display: grid; gap: 12px; min-width: 0; }
+.tier h3 { font-family: var(--font-body); font-size: 15px; font-weight: 700; line-height: 1.5; }
+.tier h3 .num { font-weight: 600; color: var(--ink-2); font-size: 13.5px; }
+.measures { display: flex; flex-wrap: wrap; gap: 6px; }
+.measures span { font-size: 12.5px; padding: 2px 9px; border-radius: 999px; background: var(--track); color: var(--ink-2); }
 
-.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
-table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 620px; }
-th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rule); white-space: nowrap; }
-th { font-weight: 500; color: var(--ink-3); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+.signals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.signal { border-top: 2px solid var(--ink); padding-top: 12px; display: grid; gap: 8px; align-content: start; }
+.signal .big { font-family: var(--font-data); font-size: 30px; font-weight: 700; line-height: 1.2; }
+.signal h3 { font-family: var(--font-body); font-size: 15px; font-weight: 700; }
+.signal p { color: var(--ink-2); font-size: 14px; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 600px; }
+th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-weight: 500; color: var(--ink-3); font-size: 12px; }
 td.r, th.r { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 tr:last-child td { border-bottom: 0; }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 1px; }
-details summary { cursor: pointer; color: var(--ink-2); font-size: 14px; }
-details summary:focus-visible { outline: 2px solid var(--s-conn); outline-offset: 2px; }
+.sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+
+.limits { display: grid; gap: 8px; margin: 0; padding-left: 1.2em; color: var(--ink-2); font-size: 14px; }
+.limits li { max-width: 40em; }
 .foot { color: var(--ink-3); font-size: 12.5px; }
-@media (max-width: 520px) {
+
+@media (max-width: 640px) {
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pair, .signals { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; gap: 2px; }
-  .tier { grid-template-columns: 1fr; gap: 6px; }
+  .tier { grid-template-columns: 1fr; gap: 8px; }
+  .heatbar div .t { display: none; }
 }
 </style>
 
 <div class="wrap">
-  <header style="display:grid;gap:12px">
-    <div class="eyebrow">Thermal comfort study · Level 2 · Weekday counts</div>
-    <h1>Where L2 footfall goes, and where comfort spend should follow</h1>
-    <p class="lede">Six L2 counters carry 95% of weekday L2 entries. Five of them are link passages at the building boundary, where outdoor heat and draughts meet the most people. Those five plus the Zone B escalator hall are the priority; the remaining four points barely register.</p>
+  <header class="hero">
+    <div class="eyebrow">热舒适研究 · L2 层 · 工作日客流</div>
+    <h1>L2 的人流都从哪里来，热舒适的钱就该花在哪里</h1>
+    <p class="lede">L2 共 10 个计数点，其中 <strong class="hl">6 个点承担了 95% 的客流</strong>。这 6 个点里有 5 个是位于建筑边界的连接通道，室外热空气、冷风和日晒在这里遇到的人最多，应该作为热舒适投入的重点。</p>
+
+    <div class="heat" role="img" aria-label="L2 各计数点客流占比热力条">
+      <div class="heatbar" id="heatbar"></div>
+      <div class="brace"><span>前 6 个点 · 94.8%</span><span>其余 4 个 · 5.2%</span></div>
+    </div>
+
+    <div class="facts">
+      <div class="fact"><span class="v">35,852</span><span class="l">L2 工作日客流（人次）</span></div>
+      <div class="fact"><span class="v">21.7<small>%</small></span><span class="l">全场客流中经 L2 进入的比例</span></div>
+      <div class="fact key"><span class="v">94.8<small>%</small></span><span class="l">L2 客流集中在 6 个计数点</span></div>
+      <div class="fact key"><span class="v">78<small>%</small></span><span class="l">L2 客流经过 5 条边界连接通道</span></div>
+    </div>
   </header>
 
-  <div class="facts" aria-label="Key figures">
-    <div class="fact"><span class="v">35,852</span><span class="l">weekday entries counted at L2 (人次)</span></div>
-    <div class="fact"><span class="v">21.7%</span><span class="l">of all mall entries arrive via L2</span></div>
-    <div class="fact"><span class="v">94.8%</span><span class="l">of L2 entries pass through 6 of the 10 L2 counters</span></div>
-    <div class="fact"><span class="v">78%</span><span class="l">of L2 entries come through the five busiest boundary links</span></div>
-  </div>
-
   <section>
-    <div class="eyebrow">Ranking</div>
-    <h2>L2 counters by weekday entries</h2>
+    <div class="eyebrow">排名</div>
+    <h2>L2 各出入口、连接通道客流排名</h2>
     <div class="chart" id="rank">
-      <div class="legend">
-        <span><i style="background:var(--s-conn)"></i>Link passage / bridge (boundary)</span>
-        <span><i style="background:var(--s-vert)"></i>Escalator / lift hall (internal)</span>
-      </div>
       <div class="rows" id="rankRows"></div>
-      <div class="axisnote">Bar length = entries (人次). Label = entries · share of L2 total. Hover a row for unique visitors and repeat rate.</div>
+      <div class="note">条形长度和颜色深浅都表示客流人次，颜色越深客流越大。“边界”指连接室外或相邻建筑的通道，“室内”指扶梯、电梯厅。悬停或用 Tab 键查看人数和重复进入率。</div>
       <div class="tip" id="tip" hidden></div>
     </div>
-    <p>The top six sit within 11% of each other (5,384 to 5,983 entries). Footfall alone does not separate them, so ranking inside that group has to come from exposure: which are open-air or glazed, which face east or west, and when each one peaks.</p>
-    <p>For scale: each of these six L2 counters carries more people than the busiest single L1 street door (A区L1-5号入口, 5,266). L2 is a main entry level for this mall, not a secondary one.</p>
+    <p>前 6 名的客流非常接近，最高 5,983、最低 5,384，相差只有 11%。所以<strong>光看客流分不出这 6 个点的先后</strong>，要再结合朝向、是否露天或玻璃围合、高峰时段来排序。</p>
   </section>
 
   <section>
-    <div class="eyebrow">By zone</div>
-    <h2>Zones B, C and D share L2 almost evenly; Zone A hardly uses it</h2>
-    <div class="chart">
-      <div class="zones" id="zones" role="img" aria-label="L2 entries by zone: A 3.5%, B 32.7%, C 30.5%, D 33.3%"></div>
-      <div class="axisnote">Width = share of L2 entries. A 1,238 · B 11,725 · C 10,952 · D 11,937.</div>
+    <div class="eyebrow">楼层与分区</div>
+    <h2>L2 是主要入口层，B、C、D 三区各占三分之一</h2>
+    <div class="pair">
+      <div class="chart">
+        <h3>各楼层入口客流占全场比例</h3>
+        <div class="strip" id="floors"></div>
+        <div class="note">L2 前 6 个点中的每一个，客流都高于 L1 最繁忙的单个临街门（A 区 5 号入口，5,266 人次）。</div>
+      </div>
+      <div class="chart">
+        <h3>L2 客流按分区</h3>
+        <div class="strip" id="zones"></div>
+        <div class="note">A 区在 L2 只有一个从 L1 上来的扶梯计数点，基本不走 L2。</div>
+      </div>
     </div>
-    <p>Spend should be spread across B, C and D rather than concentrated in one zone. Zone A's only L2 counter is the escalator coming up from L1 entrance 1, at 3.5% of L2 entries.</p>
+    <p>投入应在 B、C、D 三个区之间均衡分配，而不是集中在某一个区。</p>
   </section>
 
   <section>
-    <div class="eyebrow">Recommendation</div>
-    <h2>Comfort investment tiers</h2>
+    <div class="eyebrow">建议</div>
+    <h2>热舒适投入分档</h2>
     <div class="tiers">
       <div class="tier t1">
-        <div class="tag">Tier 1<small>≥ 15% each</small></div>
+        <div class="tag"><b>第一档</b><small>单点 ≥ 15%</small></div>
         <div class="body">
-          <p><strong>Five boundary links, about 28,000 entries (78%).</strong> D6 north passage, Culture Plaza link (B), D5 east passage, C west link, C east link. These take the full treatment: entrance lobbies or air curtains against infiltration, solar shading on glazed or open sections, and local cooling or heating in the transition zone just inside each threshold.</p>
-          <p><strong>Zone B escalator + lift hall (B1号扶梯), 5,983 entries (16.7%).</strong> This is the single busiest L2 point, but it is internal. Its risk is warm air rising up the escalator void in summer, so treat it with destratification or supply air at the L2 landing, not with envelope measures.</p>
+          <div>
+            <h3>5 条边界连接通道 <span class="num">· 约 28,000 人次 · 78%</span></h3>
+            <p>D6 号北通道、文化广场连接通道（B 区）、D5 号东通道、C 区西连接通道、C 区东连接通道。这些点是室内外交界，做全套处理。</p>
+          </div>
+          <div class="measures"><span>门斗 / 风幕防渗风</span><span>玻璃或开敞段遮阳</span><span>入口过渡区局部空调</span></div>
+          <div>
+            <h3>B 区 B1 号扶梯 + 电梯厅 <span class="num">· 5,983 人次 · 16.7%</span></h3>
+            <p>L2 单点客流最大，但位于室内。主要问题是夏季热空气沿扶梯中庭上升，在 L2 积聚，应针对热分层处理，而不是做围护结构措施。</p>
+          </div>
+          <div class="measures"><span>中庭消除热分层</span><span>L2 落客区送风</span></div>
         </div>
       </div>
       <div class="tier">
-        <div class="tag">Tier 2<small>2–10%</small></div>
+        <div class="tag"><b>第二档</b><small>2% – 10%</small></div>
         <div class="body">
-          <p><strong>Zone A entrance 1 escalator (L1→L2), 1,238 entries (3.5%).</strong> Covered by the general L2 HVAC design. Check it only if the L1 entrance 1 doors let outside air straight up the escalator.</p>
+          <div>
+            <h3>A 区 1 号入口扶梯（L1 至 L2）<span class="num">· 1,238 人次 · 3.5%</span></h3>
+            <p>纳入 L2 常规空调设计即可。只需确认 L1 的 1 号入口开门时，室外空气是否会直接沿扶梯上到 L2。</p>
+          </div>
         </div>
       </div>
       <div class="tier">
-        <div class="tag">Tier 3<small>&lt; 2%</small></div>
+        <div class="tag"><b>第三档</b><small>&lt; 2%</small></div>
         <div class="body">
-          <p><strong>D7 west Lenovo passage (610), D8 west Houhaihui passage (6), C Tengchuang link (0).</strong> Baseline provision only. D8 and Tengchuang read close to zero, so confirm on site whether they are closed or whether the counters have failed before you write them off.</p>
+          <div>
+            <h3>D7 西侧联想通道、D8 西侧后海汇通道、C 区腾创未来连接通道 <span class="num">· 合计 616 人次</span></h3>
+            <p>只做基本配置。D8（6 人次）和腾创未来（0 人次）几乎为零，建议先去现场确认是通道没开放，还是计数器故障，再决定是否不投入。</p>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <section>
-    <div class="eyebrow">Signals in the data</div>
-    <h2>Two things beyond the raw totals</h2>
-    <ul>
-      <li><strong>C east link has a repeat rate of 1.56 entries per visitor</strong>, against 1.01–1.05 for the other links. The same people cross it several times a day, likely office staff going to and from the neighbouring building. Each person spends more total time in that threshold, which is an argument for ranking it at the top of Tier 1 despite its slightly lower count.</li>
-      <li><strong>Three C区 counters are labelled L2 but tagged L1</strong> in the export (西连接通道, 东连接通道, 腾创未来连接通道). This analysis treats them as L2 by name. If the floor column is used as-is, L2 loses about 11,000 entries (31%) and Zone C drops out entirely.</li>
-    </ul>
+    <div class="eyebrow">数据里的两个发现</div>
+    <div class="signals">
+      <div class="signal">
+        <span class="big">1.56</span>
+        <h3>C 区东连接通道的人均进入次数</h3>
+        <p>其他连接通道都在 1.01 到 1.05 之间。也就是说同一批人一天要来回走好几趟，可能是去隔壁写字楼的上班族。每个人在这个通道里停留的总时间更长，所以在第一档里应排在最前。</p>
+      </div>
+      <div class="signal">
+        <span class="big">31%</span>
+        <h3>原表楼层标注错误会漏掉的 L2 客流</h3>
+        <p>C 区西连接通道、东连接通道、腾创未来连接通道这 3 个点，名称写的是 L2，楼层列却是 L1。本分析按名称算作 L2。如果直接用楼层列，L2 会少掉约 11,000 人次，C 区会整个消失。</p>
+      </div>
+    </div>
   </section>
 
   <section>
-    <div class="eyebrow">Data</div>
-    <h2>Full L2 table</h2>
+    <div class="eyebrow">数据</div>
+    <h2>L2 完整数据表</h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>#</th><th>Counter</th><th>Type</th><th class="r">Entries 人次</th><th class="r">Visitors 人数</th><th class="r">Per visitor</th><th class="r">Share of L2</th><th class="r">Cumulative</th></tr></thead>
+        <thead><tr><th class="r">排名</th><th>出入口名称</th><th>类型</th><th class="r">客流（人次）</th><th class="r">客流（人数）</th><th class="r">人均次数</th><th class="r">占 L2</th><th class="r">累计</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
   </section>
 
   <section>
-    <div class="eyebrow">Method and limits</div>
-    <details>
-      <summary>How the numbers were built, and what they cannot tell you</summary>
-      <ul style="margin-top:10px">
-        <li>Source: 工作日各出入口.xls, the weekday entrance footfall export with 145 counters. The mall total (165,414 entries) is the sum of counters that carry a contribution rate. The four zone totals (A区–D区) and the counters marked "-" are excluded, matching the export's own 贡献率 base.</li>
-        <li>A counter is treated as L2 when its name contains "L2". Type comes from the name: 扶梯 or 电梯 means internal vertical circulation, and anything else is a link passage.</li>
-        <li>Entries (人次) are used for ranking because every passage is one exposure and one door cycle. Unique visitors (人数) give the same top six.</li>
-        <li>The figures cover weekdays only, with no time-of-day breakdown. Comfort design is driven by peak hour, so the next step is an hourly profile for the six Tier 1 points (lunch and evening peaks, plus summer afternoons on the east- and west-facing links) and a weekend export to compare against.</li>
-        <li>The export does not say whether the counts are a daily average or a period total. Shares and ranks are valid either way, but absolute numbers should not be read as per-day figures until that is confirmed.</li>
-      </ul>
-    </details>
-    <p class="foot">Reproduce with <span class="num">python analysis/l2_footfall/l2_footfall.py</span>, which writes the CSVs to analysis/l2_footfall/out/.</p>
+    <div class="eyebrow">方法与局限</div>
+    <ul class="limits">
+      <li><strong>数据来源：</strong>工作日各出入口.xls，共 145 个计数点。全场合计 165,414 人次，只计入有贡献率的计数点。A 至 D 区的四个分区汇总行，以及贡献率标为“-”的点不计入，与原表贡献率的口径一致。</li>
+      <li><strong>L2 判定：</strong>名称中含“L2”的计数点算作 L2。名称含“扶梯”或“电梯”的归为室内，其余归为边界连接通道。</li>
+      <li><strong>排名口径：</strong>按人次排名，因为每通过一次就是一次暴露、一次开门。按人数排名，前 6 名不变。</li>
+      <li><strong>没有分时段数据：</strong>热舒适设计按高峰小时来做。下一步建议要第一档 6 个点的逐小时客流（午高峰、晚高峰，以及东、西向通道的夏季午后），再加一份周末数据做对比。</li>
+      <li><strong>统计周期不明：</strong>原表没有说明是日均还是整个时段的累计。占比和排名可以直接用，绝对人数在确认之前不要当作每天的量。</li>
+    </ul>
+    <p class="foot">重新运行：<span class="num">python analysis/l2_footfall/l2_footfall.py</span>，结果 CSV 输出到 analysis/l2_footfall/out/。</p>
   </section>
 </div>
 
 <script>
 const L2 = [
-  { cn: "B区L2-B1号扶梯+电梯厅", en: "Zone B · Escalator B1 + lift hall", type: "vert", trips: 5983, people: 5232 },
-  { cn: "D区L2-D6号北通道入口", en: "Zone D · D6 north passage", type: "conn", trips: 5744, people: 5641 },
-  { cn: "B区L2-文化广场连接通道", en: "Zone B · Culture Plaza link", type: "conn", trips: 5742, people: 5529 },
-  { cn: "D区L2-D5号东通道入口", en: "Zone D · D5 east passage", type: "conn", trips: 5577, people: 5488 },
-  { cn: "C区L2-西连接通道", en: "Zone C · West link", type: "conn", trips: 5568, people: 5325 },
-  { cn: "C区L2-东连接通道", en: "Zone C · East link", type: "conn", trips: 5384, people: 3448 },
-  { cn: "A区1号入口扶梯（L1至L2）", en: "Zone A · Entrance 1 escalator", type: "vert", trips: 1238, people: 930 },
-  { cn: "D区L2-D7号西侧联想通道入口", en: "Zone D · D7 west Lenovo passage", type: "conn", trips: 610, people: 528 },
-  { cn: "D区L2-D8号西侧后海汇通道入口", en: "Zone D · D8 west Houhaihui passage", type: "conn", trips: 6, people: 6 },
-  { cn: "C区L2-腾创未来连接通道", en: "Zone C · Tengchuang link", type: "conn", trips: 0, people: 0 },
+  { name: "B 区 B1 号扶梯 + 电梯厅", cn: "B区L2-B1号扶梯+电梯厅", short: "B1 扶梯", type: "in", trips: 5983, people: 5232 },
+  { name: "D 区 D6 号北通道", cn: "D区L2-D6号北通道入口", short: "D6 北", type: "edge", trips: 5744, people: 5641 },
+  { name: "B 区文化广场连接通道", cn: "B区L2-文化广场连接通道", short: "文化广场", type: "edge", trips: 5742, people: 5529 },
+  { name: "D 区 D5 号东通道", cn: "D区L2-D5号东通道入口", short: "D5 东", type: "edge", trips: 5577, people: 5488 },
+  { name: "C 区西连接通道", cn: "C区L2-西连接通道", short: "C 西", type: "edge", trips: 5568, people: 5325 },
+  { name: "C 区东连接通道", cn: "C区L2-东连接通道", short: "C 东", type: "edge", trips: 5384, people: 3448 },
+  { name: "A 区 1 号入口扶梯", cn: "A区1号入口扶梯（L1至L2）", short: "A 扶梯", type: "in", trips: 1238, people: 930 },
+  { name: "D 区 D7 西侧联想通道", cn: "D区L2-D7号西侧联想通道入口", short: "D7", type: "edge", trips: 610, people: 528 },
+  { name: "D 区 D8 西侧后海汇通道", cn: "D区L2-D8号西侧后海汇通道入口", short: "D8", type: "edge", trips: 6, people: 6 },
+  { name: "C 区腾创未来连接通道", cn: "C区L2-腾创未来连接通道", short: "腾创", type: "edge", trips: 0, people: 0 },
 ];
-const ZONES = [["A", 1238], ["B", 11725], ["C", 10952], ["D", 11937]];
+const FLOORS = [["B1", 69605], ["L1", 46409], ["L2", 35852], ["B1M", 6398], ["B2", 3634], ["B3", 2375], ["B4", 1141]];
+const ZONES = [["B 区", 11725], ["D 区", 11937], ["C 区", 10952], ["A 区", 1238]].sort((a, b) => b[1] - a[1]);
 const total = L2.reduce((s, d) => s + d.trips, 0);
 const max = Math.max(...L2.map(d => d.trips));
-const fmt = n => n.toLocaleString("en-US");
+const fmt = n => n.toLocaleString("zh-CN");
 const pct = (n, d = 1) => (n * 100).toFixed(d) + "%";
-const color = t => t === "conn" ? "var(--s-conn)" : "var(--s-vert)";
-const typeLabel = t => t === "conn" ? "Link passage" : "Escalator / lift";
+const heat = t => { const r = t / max; return r > 0.95 ? "var(--h6)" : r > 0.85 ? "var(--h5)" : r > 0.15 ? "var(--h3)" : r > 0.05 ? "var(--h2)" : "var(--h1)"; };
+const typeLabel = t => t === "edge" ? "边界通道" : "室内扶梯";
+const rep = d => d.people ? (d.trips / d.people).toFixed(2) : "–";
 
-const rows = document.getElementById("rankRows");
 const tip = document.getElementById("tip");
 const chart = document.getElementById("rank");
-L2.forEach(d => {
-  const share = d.trips / total;
+function showTip(d, x, y) {
+  tip.innerHTML = `<strong>${d.cn}</strong><br>${typeLabel(d.type)}<br>人次 <span class="num">${fmt(d.trips)}</span> · 人数 <span class="num">${fmt(d.people)}</span><br>人均次数 <span class="num">${rep(d)}</span> · 占 L2 <span class="num">${pct(d.trips / total)}</span>`;
+  tip.hidden = false;
+  const cr = chart.getBoundingClientRect();
+  let left = x - cr.left + 14, top = y - cr.top + 14;
+  if (left + 258 > cr.width) left = Math.max(8, cr.width - 258);
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+
+// 首屏热力条（只画占比 > 1% 的点，其余合并）
+const hb = document.getElementById("heatbar");
+const big = L2.filter(d => d.trips / total > 0.01);
+const restT = total - big.reduce((s, d) => s + d.trips, 0);
+big.concat([{ short: "其余", trips: restT, rest: true }]).forEach(d => {
   const el = document.createElement("div");
-  el.className = "row";
-  el.tabIndex = 0;
-  el.innerHTML = `<div class="name"><span>${d.en}</span><small>${d.cn}</small></div>
-    <div class="bar"><b style="width:calc((100% - 7.5em) * ${d.trips / max});background:${color(d.type)}"></b>
-    <span class="val">${fmt(d.trips)} · ${pct(share)}</span></div>`;
-  const show = (x, y) => {
-    const rep = d.people ? (d.trips / d.people).toFixed(2) : "–";
-    tip.innerHTML = `<strong>${d.cn}</strong><br>${typeLabel(d.type)}<br>
-      Entries <span class="num">${fmt(d.trips)}</span> · visitors <span class="num">${fmt(d.people)}</span><br>
-      Per visitor <span class="num">${rep}</span> · share of L2 <span class="num">${pct(share)}</span>`;
-    tip.hidden = false;
-    const cr = chart.getBoundingClientRect();
-    let left = x - cr.left + 14, top = y - cr.top + 14;
-    if (left + 260 > cr.width) left = Math.max(8, cr.width - 268);
-    tip.style.left = left + "px"; tip.style.top = top + "px";
-  };
-  el.addEventListener("mousemove", e => show(e.clientX, e.clientY));
+  el.style.flex = `${d.trips} 0 0`;
+  el.style.background = d.rest ? "var(--h1)" : heat(d.trips);
+  if (d.rest || d.trips / max < 0.3) el.style.color = "var(--ink-2)";
+  el.innerHTML = `<span class="t">${d.short}</span><span class="num">${pct(d.trips / total, 0)}</span>`;
+  el.title = d.rest ? `D7、D8、腾创未来：${fmt(d.trips)} 人次` : `${d.cn}：${fmt(d.trips)} 人次（${pct(d.trips / total)}）`;
+  hb.appendChild(el);
+});
+
+// 排名
+const rows = document.getElementById("rankRows");
+L2.forEach((d, i) => {
+  if (i === 6) {
+    const dv = document.createElement("div");
+    dv.className = "divider"; dv.innerHTML = "<span>以上 6 个点合计 94.8%</span>";
+    rows.appendChild(dv);
+  }
+  const el = document.createElement("div");
+  el.className = "row"; el.tabIndex = 0;
+  el.innerHTML = `<div class="name"><span>${d.name}<span class="chip ${d.type === "in" ? "in" : ""}">${d.type === "in" ? "室内" : "边界"}</span></span><small>${d.cn}</small></div>
+    <div class="bar"><b style="width:calc((100% - 8.5em) * ${d.trips / max});background:${heat(d.trips)}"></b>
+    <span class="val"><em>${fmt(d.trips)}</em> · ${pct(d.trips / total)}</span></div>`;
+  el.addEventListener("mousemove", e => showTip(d, e.clientX, e.clientY));
   el.addEventListener("mouseleave", () => tip.hidden = true);
-  el.addEventListener("focus", () => { const r = el.getBoundingClientRect(); show(r.left + 40, r.bottom - 6); });
+  el.addEventListener("focus", () => { const r = el.getBoundingClientRect(); showTip(d, r.left + 40, r.bottom - 6); });
   el.addEventListener("blur", () => tip.hidden = true);
   rows.appendChild(el);
 });
 
-const zones = document.getElementById("zones");
-const ztotal = ZONES.reduce((s, z) => s + z[1], 0);
-zones.style.gridTemplateColumns = ZONES.map(z => `minmax(0, ${z[1] / ztotal}fr)`).join(" ");
-ZONES.forEach(([z, v]) => {
-  const el = document.createElement("div");
-  el.textContent = v / ztotal > 0.08 ? `${z} · ${pct(v / ztotal)}` : z;
-  el.title = `Zone ${z}: ${fmt(v)} entries (${pct(v / ztotal)})`;
-  zones.appendChild(el);
-});
+// 楼层、分区
+function strip(id, data, on) {
+  const sum = data.reduce((s, x) => s + x[1], 0);
+  const m = Math.max(...data.map(x => x[1]));
+  document.getElementById(id).innerHTML = data.map(([k, v]) =>
+    `<div class="srow ${on(k) ? "on" : ""}" title="${k}：${fmt(v)} 人次"><span class="lab">${k}</span><span class="trk"><b style="width:${(v / m) * 100}%"></b></span><span class="pv">${pct(v / sum)}</span></div>`
+  ).join("");
+}
+strip("floors", FLOORS, k => k === "L2");
+strip("zones", ZONES, k => k !== "A 区");
 
+// 数据表
 let cum = 0;
 document.getElementById("tbody").innerHTML = L2.map((d, i) => {
   const s = d.trips / total; cum += s;
-  return `<tr><td class="r">${i + 1}</td><td>${d.cn}</td><td><span class="dot" style="background:${color(d.type)}"></span>${typeLabel(d.type)}</td>
-    <td class="r">${fmt(d.trips)}</td><td class="r">${fmt(d.people)}</td><td class="r">${d.people ? (d.trips / d.people).toFixed(2) : "–"}</td>
-    <td class="r">${pct(s)}</td><td class="r">${pct(cum)}</td></tr>`;
+  return `<tr><td class="r">${i + 1}</td><td>${d.cn}</td><td><span class="sw" style="background:${heat(d.trips)}"></span>${typeLabel(d.type)}</td>
+    <td class="r">${fmt(d.trips)}</td><td class="r">${fmt(d.people)}</td><td class="r">${rep(d)}</td><td class="r">${pct(s)}</td><td class="r">${pct(cum)}</td></tr>`;
 }).join("");
 </script>
