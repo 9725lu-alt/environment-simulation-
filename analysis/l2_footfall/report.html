@@ -132,6 +132,14 @@ tr:last-child td { border-bottom: 0; }
 .limits li { max-width: 40em; }
 .foot { color: var(--ink-3); font-size: 12.5px; }
 
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.toolbar .eyebrow { flex: 1; min-width: 12em; }
+.export { font: 500 13px/1 var(--font-body); color: var(--on-hot); background: var(--h5); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.export:hover { background: var(--h6); }
+.export:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.export:disabled { opacity: .55; cursor: progress; }
+.export svg { width: 15px; height: 15px; }
+.export-msg { font-size: 12.5px; color: var(--ink-3); flex-basis: 100%; text-align: right; }
 @media (max-width: 640px) {
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pair, .signals { grid-template-columns: 1fr; }
@@ -143,7 +151,14 @@ tr:last-child td { border-bottom: 0; }
 
 <div class="wrap">
   <header class="hero">
-    <div class="eyebrow">热舒适研究 · L2 层 · 工作日客流</div>
+    <div class="toolbar">
+      <div class="eyebrow">热舒适研究 · L2 层 · 工作日客流</div>
+      <button class="export" id="exportBtn" type="button" hidden>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="1.5" y="3" width="13" height="8.5" rx="1"/><path d="M8 6v8M5.5 11.5 8 14l2.5-2.5"/></svg>
+        导出 16:9 横版
+      </button>
+      <div class="export-msg" id="exportMsg" role="status" hidden></div>
+    </div>
     <h1>L2 人流分析</h1>
     <p class="lede">L2 共 10 个计数点，其中 <strong class="hl">6 个点承担了 95% 的客流</strong>。这 6 个点里有 5 个是位于建筑边界的连接通道，室外热空气、冷风和日晒在这里遇到的人最多，应该作为热舒适投入的重点。</p>
 
@@ -355,4 +370,156 @@ document.getElementById("tbody").innerHTML = L2.map((d, i) => {
   return `<tr><td class="r">${i + 1}</td><td>${d.cn}</td><td><span class="sw" style="background:${heat(d.trips)}"></span>${typeLabel(d.type)}</td>
     <td class="r">${fmt(d.trips)}</td><td class="r">${fmt(d.people)}</td><td class="r">${rep(d)}</td><td class="r">${pct(s)}</td><td class="r">${pct(cum)}</td></tr>`;
 }).join("");
+// ===== 导出 16:9 横版（1920×1080 PNG）=====
+// 幻灯片固定用浅色，方便放进 PPT。
+const SLIDE = { w: 1920, h: 1080, m: 96,
+  bg: "#ffffff", ink: "#15191d", ink2: "#4a525a", ink3: "#7c848c", rule: "#dfe2e6", track: "#eceef1",
+  g: ["#dcefe2", "#a8d8b6", "#6dbd88", "#3a9a5c", "#217d47", "#125c33"], cool: "#5f7f8c" };
+const F_SERIF = '"Noto Serif SC", "Songti SC", serif';
+const F_SANS = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+const F_MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+const slideHeat = t => { const r = t / max; return r > 0.95 ? SLIDE.g[5] : r > 0.85 ? SLIDE.g[4] : r > 0.15 ? SLIDE.g[2] : r > 0.05 ? SLIDE.g[1] : SLIDE.g[0]; };
+
+async function slideFonts() {
+  const sample = "L2人流分析热舒适研究层工作日客流各出入口连接通道排名第一二三档边界室内扶梯电梯厅区号北东西南侧文化广场联想后海汇腾创未来入口合计约人次承担了的其中个是建筑应作为投入重点数据来源单点以上下其余";
+  try {
+    await Promise.all([
+      document.fonts.load(`900 64px ${F_SERIF}`, sample), document.fonts.load(`600 30px ${F_SERIF}`, sample),
+      document.fonts.load(`400 22px ${F_SANS}`, sample), document.fonts.load(`500 22px ${F_SANS}`, sample),
+      document.fonts.load(`700 22px ${F_SANS}`, sample), document.fonts.load(`700 40px ${F_MONO}`, "0123456789.,%·"),
+      document.fonts.load(`400 18px ${F_MONO}`, "0123456789.,%·"),
+    ]);
+  } catch (e) { /* 字体没加载到就用系统字体 */ }
+}
+
+function wrapText(ctx, text, x, y, maxW, lh) {
+  let line = "";
+  for (const ch of text) {
+    if (ctx.measureText(line + ch).width > maxW && line) { ctx.fillText(line, x, y); line = ch; y += lh; }
+    else line += ch;
+  }
+  if (line) ctx.fillText(line, x, y);
+  return y + lh;
+}
+
+function roundBar(ctx, x, y, w, h, r) {
+  r = Math.min(r, w);
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+}
+
+async function renderSlide() {
+  await slideFonts();
+  const S = SLIDE, c = document.createElement("canvas");
+  c.width = S.w; c.height = S.h;
+  const ctx = c.getContext("2d");
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, S.w, S.h);
+  ctx.fillStyle = S.g[4]; ctx.fillRect(0, 0, S.w, 10);
+
+  // 标题区
+  ctx.fillStyle = S.ink3; ctx.font = `400 18px ${F_MONO}`;
+  ctx.fillText("热舒适研究  ·  L2 层  ·  工作日客流", S.m, 96);
+  ctx.fillStyle = S.ink; ctx.font = `900 64px ${F_SERIF}`;
+  ctx.fillText("L2 人流分析", S.m, 172);
+  ctx.font = `400 26px ${F_SANS}`; ctx.fillStyle = S.ink2;
+  const lead1 = "10 个计数点中，", lead2 = "6 个点承担了 95% 的客流", lead3 = "，其中 5 个是建筑边界连接通道，是热舒适投入的重点。";
+  let x = S.m;
+  ctx.fillText(lead1, x, 226); x += ctx.measureText(lead1).width;
+  ctx.font = `700 26px ${F_SANS}`; ctx.fillStyle = S.g[4]; ctx.fillText(lead2, x, 226); x += ctx.measureText(lead2).width;
+  ctx.font = `400 26px ${F_SANS}`; ctx.fillStyle = S.ink2; ctx.fillText(lead3, x, 226);
+  ctx.fillStyle = S.rule; ctx.fillRect(S.m, 264, S.w - 2 * S.m, 2);
+
+  // 左：排名图
+  const L = { x: S.m, top: 326, nameW: 380, barX: S.m + 400, barMax: 440, rowH: 64 };
+  ctx.fillStyle = S.ink; ctx.font = `600 30px ${F_SERIF}`;
+  ctx.fillText("L2 各出入口、连接通道客流排名（人次）", L.x, L.top);
+  L2.forEach((d, i) => {
+    const y = L.top + 40 + i * L.rowH + (i >= 6 ? 14 : 0);
+    ctx.font = `500 22px ${F_SANS}`; ctx.fillStyle = S.ink;
+    ctx.fillText(d.name, L.x, y + 28);
+    const nw = ctx.measureText(d.name).width;
+    ctx.font = `400 15px ${F_SANS}`;
+    const tag = d.type === "in" ? "室内" : "边界", tw = ctx.measureText(tag).width + 14;
+    ctx.strokeStyle = d.type === "in" ? S.cool : S.rule; ctx.lineWidth = 1.5;
+    ctx.strokeRect(L.x + nw + 10, y + 10, tw, 24);
+    ctx.fillStyle = d.type === "in" ? S.cool : S.ink2; ctx.fillText(tag, L.x + nw + 17, y + 28);
+    const bw = Math.max(3, L.barMax * d.trips / max);
+    ctx.fillStyle = slideHeat(d.trips); roundBar(ctx, L.barX, y + 6, bw, 30, 5);
+    ctx.font = `700 20px ${F_MONO}`; ctx.fillStyle = S.ink;
+    const v = fmt(d.trips); ctx.fillText(v, L.barX + bw + 12, y + 29);
+    const vw = ctx.measureText(v).width;
+    ctx.font = `400 18px ${F_MONO}`; ctx.fillStyle = S.ink3;
+    ctx.fillText(" · " + pct(d.trips / total), L.barX + bw + 12 + vw, y + 29);
+    if (i === 5) {
+      const ly = y + L.rowH + 2;
+      ctx.setLineDash([6, 6]); ctx.strokeStyle = S.rule; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(L.x, ly); ctx.lineTo(L.barX + L.barMax + 140, ly); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = `400 16px ${F_SANS}`; ctx.fillStyle = S.ink3; ctx.textAlign = "right";
+      ctx.fillText("以上 6 个点合计 94.8%", L.barX + L.barMax + 140, ly - 8); ctx.textAlign = "left";
+    }
+  });
+
+  // 右：关键数字
+  const R = { x: 1140, w: S.w - S.m - 1140 };
+  const kpis = [["35,852", "L2 工作日客流（人次）", false], ["21.7%", "全场客流经 L2 进入", false],
+                ["94.8%", "集中在 6 个计数点", true], ["78%", "经过 5 条边界连接通道", true]];
+  kpis.forEach(([v, l, key], i) => {
+    const kx = R.x + (i % 2) * (R.w / 2), ky = 300 + Math.floor(i / 2) * 120;
+    ctx.fillStyle = key ? S.g[4] : S.rule; ctx.fillRect(kx, ky, 4, 96);
+    ctx.font = `700 44px ${F_MONO}`; ctx.fillStyle = key ? S.g[4] : S.ink; ctx.fillText(v, kx + 22, ky + 50);
+    ctx.font = `400 19px ${F_SANS}`; ctx.fillStyle = S.ink2; ctx.fillText(l, kx + 22, ky + 86);
+  });
+
+  // 右：分档
+  ctx.fillStyle = S.ink; ctx.font = `600 30px ${F_SERIF}`;
+  ctx.fillText("热舒适投入分档", R.x, 584);
+  const tiers = [
+    ["第一档", "单点 ≥ 15%", "5 条边界连接通道 + B 区 B1 号扶梯厅", "门斗 / 风幕防渗风，遮阳，入口过渡区局部空调；扶梯中庭消除热分层", true],
+    ["第二档", "2% – 10%", "A 区 1 号入口扶梯（L1 至 L2）", "纳入 L2 常规空调设计", false],
+    ["第三档", "< 2%", "D7、D8、腾创未来连接通道", "基本配置；D8 与腾创接近 0，先现场核实", false],
+  ];
+  let ty = 616;
+  tiers.forEach(([t, r, who, what, hot]) => {
+    const h = hot ? 150 : 112;
+    ctx.fillStyle = hot ? "#f1f8f3" : S.bg; ctx.fillRect(R.x, ty, R.w, h);
+    ctx.strokeStyle = hot ? S.g[3] : S.rule; ctx.lineWidth = 2; ctx.strokeRect(R.x + 1, ty + 1, R.w - 2, h - 2);
+    if (hot) { ctx.fillStyle = S.g[3]; ctx.fillRect(R.x, ty, 6, h); }
+    ctx.font = `900 28px ${F_SERIF}`; ctx.fillStyle = hot ? S.g[4] : S.ink; ctx.fillText(t, R.x + 26, ty + 44);
+    ctx.font = `400 16px ${F_MONO}`; ctx.fillStyle = S.ink3; ctx.fillText(r, R.x + 26, ty + 72);
+    ctx.font = `700 21px ${F_SANS}`; ctx.fillStyle = S.ink; ctx.fillText(who, R.x + 150, ty + 42);
+    ctx.font = `400 19px ${F_SANS}`; ctx.fillStyle = S.ink2;
+    wrapText(ctx, what, R.x + 150, ty + 76, R.w - 176, 30);
+    ty += h + 14;
+  });
+
+  // 页脚
+  ctx.font = `400 16px ${F_SANS}`; ctx.fillStyle = S.ink3;
+  ctx.fillText("数据来源：工作日各出入口客流统计，共 145 个计数点，全场合计 165,414 人次。C 区 3 个名称含 L2 的计数点按 L2 计。", S.m, S.h - 52);
+  return c;
+}
+
+(async () => {
+  const btn = document.getElementById("exportBtn"), msg = document.getElementById("exportMsg");
+  const downloads = window.claude?.use ? await window.claude.use("downloads") : null;
+  if (!downloads) return;
+  btn.hidden = false;
+  const say = t => { msg.textContent = t; msg.hidden = !t; };
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; say("正在生成 1920×1080 图片…");
+    try {
+      const c = await renderSlide();
+      const blob = await new Promise(r => c.toBlob(r, "image/png"));
+      await downloads.save({ filename: "L2人流分析_16x9.png", data: blob });
+      say("");
+    } catch (e) {
+      const code = e && e.code;
+      say(code === "declined" ? "" : code === "rate_limited" ? "已有一个保存窗口打开，请先处理后再试。"
+        : "这里暂时无法导出图片。");
+      if (["unavailable", "not_granted", "capability_disabled", "capability_removed"].includes(code)) btn.hidden = true;
+    } finally { btn.disabled = false; }
+  });
+})();
 </script>
