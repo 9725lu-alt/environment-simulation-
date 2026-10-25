@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Century City Walk Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: site plan on the left, trip planner on the right, garage table full width below. */
+:root {
+  --bg: #f2f1ee; --panel: #ffffff; --fg: #1f2124; --muted: #62666c; --line: #d8d7d2;
+  --plaza: #ebe8e1; --road: #8a8f96; --roadline: #f2f1ee; --store: #d9d4c7; --anchor: #c7bfae; --dining: #e3cfb4; --fun: #cdd3dd;
+  --garage: #3d4248; --garage-fg: #ffffff;
+  --euc: #c2367a; --walk: #13806f; --drive: #2f5fd0; --warn: #b42318; --warn-bg: #fdecea; --ok-bg: #e5f3ee; --best: #d7efe6;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #131416; --panel: #1b1d20; --fg: #e7e8ea; --muted: #9a9fa6; --line: #2e3136;
+  --plaza: #24262a; --road: #44484e; --roadline: #6d727a; --store: #3a3833; --anchor: #4a453b; --dining: #4d4234; --fun: #353b46;
+  --garage: #c9ced4; --garage-fg: #15171a;
+  --euc: #f06aa9; --walk: #3cc8b1; --drive: #7aa2ff; --warn: #ff8a80; --warn-bg: #3a1d1b; --ok-bg: #16302a; --best: #1c3a31; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #131416; --panel: #1b1d20; --fg: #e7e8ea; --muted: #9a9fa6; --line: #2e3136;
+  --plaza: #24262a; --road: #44484e; --roadline: #6d727a; --store: #3a3833; --anchor: #4a453b; --dining: #4d4234; --fun: #353b46;
+  --garage: #c9ced4; --garage-fg: #15171a;
+  --euc: #f06aa9; --walk: #3cc8b1; --drive: #7aa2ff; --warn: #ff8a80; --warn-bg: #3a1d1b; --ok-bg: #16302a; --best: #1c3a31; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body) }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 20px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; margin-bottom: 14px }
+h1 { font: 800 clamp(24px, 4vw, 34px)/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.lede { color: var(--muted); margin: 4px 0 0; max-width: 74ch }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted) }
+.legend span { display: inline-flex; align-items: center; gap: 6px }
+.sw { width: 18px; height: 4px; border-radius: 2px; display: inline-block }
+.grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 18px; align-items: start }
+@media (max-width: 920px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0 }
+.side { display: grid; gap: 14px; min-width: 0 }
+h2 { font: 600 13px/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px }
+#map { display: block; width: 100%; height: auto; border-radius: 6px; cursor: crosshair }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 12px; font-size: 14px }
+.controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted) }
+select, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px }
+button { cursor: pointer }
+button:hover, select:hover { border-color: var(--muted) }
+:focus-visible { outline: 2px solid var(--walk); outline-offset: 2px }
+.hint { font-size: 13px; color: var(--muted); margin: 10px 0 0 }
+.trip { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.trip label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; min-width: 0 }
+.trip label.full { grid-column: 1 / -1 }
+.trip select { width: 100%; text-transform: none; letter-spacing: 0 }
+.bars { display: grid; gap: 12px; margin-top: 14px }
+.bar-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline }
+.bar-name { font-weight: 700 }
+.bar-name small { font-weight: 400; color: var(--muted) }
+.bar-val { font: 600 15px var(--mono); font-variant-numeric: tabular-nums; text-align: right }
+.track { grid-column: 1 / -1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden }
+.fill { height: 100%; border-radius: 5px; transition: width .25s ease }
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px }
+.plan { border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0 }
+.plan.win { border-color: var(--walk); background: var(--ok-bg) }
+.plan h3 { font: 700 15px var(--display); margin: 0 0 2px; display: flex; justify-content: space-between; gap: 8px }
+.plan .tag { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--walk) }
+.plan dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; font-size: 13.5px }
+.plan dt { color: var(--muted) }
+.plan dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums }
+.plan dd.total { font-weight: 600 }
+.plan p { margin: 6px 0 0; font-size: 13px; color: var(--muted) }
+.flags { display: grid; gap: 8px; margin-top: 12px }
+.flag { font-size: 14px; padding: 8px 10px; border-radius: 6px; background: var(--ok-bg) }
+.flag.warn { background: var(--warn-bg) }
+.flag.warn b { color: var(--warn) }
+.mono { font-family: var(--mono); font-size: 0.92em }
+.tablewrap { overflow-x: auto; margin-top: 4px }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+thead th { font: 600 12px var(--display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted) }
+td { font-family: var(--mono); font-size: 13.5px }
+td:first-child { font-family: var(--body); font-size: 14px }
+td.best { background: var(--best); font-weight: 600 }
+tbody tr { cursor: pointer }
+tbody tr:hover td:first-child, tbody tr.sel td:first-child { text-decoration: underline }
+.below { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 18px; margin-top: 18px; align-items: start }
+@media (max-width: 920px) { .below { grid-template-columns: minmax(0, 1fr) } }
+.mismatch { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px }
+.mismatch li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: baseline; cursor: pointer }
+.ratio { font: 600 13px var(--mono); color: var(--warn); min-width: 4.2em }
+.note { font-size: 13px; color: var(--muted); margin: 10px 0 0 }
+a { color: var(--drive) }
+@media (prefers-reduced-motion: reduce) { .fill { transition: none } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Century City Walk Planner</h1>
+    <p class="lede">A shopping district split into four blocks by streets, modeled loosely on Westfield Century City in Los Angeles. You can only cross at crosswalks, and every block has its own garage. Should you walk to the next store, or move your car to a closer garage?</p>
+  </div>
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw" style="background:var(--euc)"></i>Straight line</span>
+    <span><i class="sw" style="background:var(--walk)"></i>Walking</span>
+    <span><i class="sw" style="background:var(--drive)"></i>Driving</span>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="panel" aria-label="Site plan">
+    <canvas id="map" width="900" height="600"></canvas>
+    <div class="controls">
+      <label for="heat">Heatmap
+        <select id="heat">
+          <option value="none">Off</option>
+          <option value="to" selected>Walking distance to “Going to”</option>
+          <option value="car">Walking distance from your car</option>
+        </select>
+      </label>
+      <button id="play">Pause shoppers</button>
+    </div>
+    <p class="hint">Click a store to go there. Click a garage (P1 to P4) to park there. Shift-click a store, or click a shopper, to set where you are now. The layout is simplified for teaching. Store and garage positions are illustrative, not the real floor plan. One cell is 10&nbsp;m.</p>
+  </section>
+
+  <div class="side">
+    <section class="panel" aria-label="Trip">
+      <h2>Your trip</h2>
+      <div class="trip">
+        <label for="fromSel">You are at<select id="fromSel"></select></label>
+        <label for="toSel">Going to<select id="toSel"></select></label>
+        <label for="carSel" class="full">Your car is parked in<select id="carSel"></select></label>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="flags" id="flags" aria-live="polite"></div>
+    </section>
+    <section class="panel" aria-label="Plans">
+      <h2>Walk or move the car?</h2>
+      <div class="plans" id="plans"></div>
+      <p class="note">The totals include walking back to your car at the end, since you have to return to it either way. Assumes walking at 80&nbsp;m/min, driving at 300&nbsp;m/min, plus 4&nbsp;min to leave one garage and park in the next.</p>
+    </section>
+  </div>
+</div>
+
+<div class="below">
+  <section class="panel" aria-label="Best garage for each store">
+    <h2>Which garage is closest on foot to each store?</h2>
+    <div class="tablewrap"><table id="garageTable"></table></div>
+    <p class="note">Walking distance in meters from each garage’s elevator to the store entrance. The highlighted cell is the best place to park. Click a row to plan a trip to that store.</p>
+  </section>
+  <section class="panel" aria-label="Close in a straight line, far on foot">
+    <h2>Close in a straight line, far on foot</h2>
+    <ul class="mismatch" id="mismatch"></ul>
+    <p class="note">Store pairs with the biggest gap between the straight line and the actual walk. These are usually stores across a street from each other with no crosswalk nearby.</p>
+  </section>
+</div>
+<p class="note"><a href="index.html">Riverside Distance Lab</a> is the first version of this simulation, set in a small riverside town.</p>
+</div>
+
+<script>
+(() => {
+"use strict";
+const COLS = 48, ROWS = 32, M = 10;           // 1 cell = 10 m
+const WALK_M_MIN = 80, DRIVE_M_MIN = 300, REPARK_MIN = 4;
+
+// ---------- site plan ----------
+// '.' plaza/sidewalk  'r' road  'x' crosswalk  '#' store  'G' garage
+const T = Array.from({ length: ROWS }, () => Array(COLS).fill("."));
+const inside = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+const fill = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (inside(i, j)) T[j][i] = c; };
+fill(0, 0, COLS, 2, "r"); fill(0, ROWS - 2, COLS, 2, "r"); fill(0, 0, 2, ROWS, "r"); fill(COLS - 2, 0, 2, ROWS, "r");
+fill(0, 15, COLS, 2, "r");                        // east-west street through the middle
+fill(23, 0, 2, ROWS, "r");                        // north-south street through the middle
+fill(6, 15, 1, 2, "x"); fill(40, 15, 1, 2, "x");  // crosswalks over the east-west street
+fill(23, 5, 2, 1, "x"); fill(23, 27, 2, 1, "x");  // crosswalks over the north-south street
+
+const BLOCK = { NW: "North-west block", NE: "North-east block", SW: "South-west block", SE: "South-east block" };
+// door side: N/S/E/W. The store's location is the sidewalk cell in front of its door.
+const STORES = [
+  ["Dept. Store North", "anchor", 13, 3, 9, 6, "S", "NW"],
+  ["Cinema", "fun", 3, 10, 8, 4, "N", "NW"],
+  ["Food Hall", "dining", 14, 11, 7, 3, "N", "NW"],
+  ["Electronics", "store", 26, 3, 6, 4, "S", "NE"],
+  ["Sportswear", "store", 33, 3, 5, 4, "S", "NE"],
+  ["Bookstore", "store", 26, 10, 8, 4, "N", "NE"],
+  ["Beauty", "store", 36, 11, 6, 3, "N", "NE"],
+  ["Grocery", "store", 3, 18, 8, 5, "E", "SW"],
+  ["Kids", "store", 14, 18, 7, 4, "S", "SW"],
+  ["Café", "dining", 14, 25, 5, 3, "N", "SW"],
+  ["Dept. Store South", "anchor", 26, 18, 9, 7, "E", "SE"],
+  ["Shoes", "store", 38, 18, 7, 4, "W", "SE"],
+  ["Restaurant Row", "dining", 26, 26, 8, 3, "N", "SE"],
+].map(([name, cat, x, y, w, h, side, block]) => {
+  fill(x, y, w, h, "#");
+  const mx = x + Math.floor(w / 2), my = y + Math.floor(h / 2);
+  const door = side === "S" ? [mx, y + h] : side === "N" ? [mx, y - 1] : side === "E" ? [x + w, my] : [x - 1, my];
+  return { kind: "store", id: name, name, cat, rect: [x, y, w, h], x: door[0], y: door[1], block };
+});
+// garages: footprint, pedestrian exit (elevator) side, and the road cell cars use to enter
+const GARAGES = [
+  ["P1", 2, 3, 7, 5, "S", [1, 5], "NW"],
+  ["P2", 39, 3, 7, 6, "S", [46, 6], "NE"],
+  ["P3", 2, 24, 8, 6, "E", [1, 26], "SW"],
+  ["P4", 38, 23, 8, 7, "N", [46, 26], "SE"],
+].map(([name, x, y, w, h, side, road, block]) => {
+  fill(x, y, w, h, "G");
+  const mx = x + Math.floor(w / 2), my = y + Math.floor(h / 2);
+  const ped = side === "S" ? [mx, y + h] : side === "N" ? [mx, y - 1] : side === "E" ? [x + w, my] : [x - 1, my];
+  return { kind: "garage", id: name, name, rect: [x, y, w, h], x: ped[0], y: ped[1], rx: road[0], ry: road[1], block };
+});
+
+const walkable = (x, y) => inside(x, y) && (T[y][x] === "." || T[y][x] === "x");
+const drivable = (x, y) => inside(x, y) && (T[y][x] === "r" || T[y][x] === "x");
+
+// ---------- shortest paths ----------
+const SQ = Math.SQRT2;
+const DIR8 = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,SQ],[1,-1,SQ],[-1,1,SQ],[-1,-1,SQ]];
+const DIR4 = DIR8.slice(0, 4);
+const idx = (x, y) => y * COLS + x;
+function makeField(ok, dirs) {
+  const cache = new Map();
+  const step = (x, y, dx, dy) => ok(x + dx, y + dy) && (!(dx && dy) || (ok(x + dx, y) && ok(x, y + dy)));
+  function field(sx, sy) {
+    const k0 = idx(sx, sy);
+    if (cache.has(k0)) return cache.get(k0);
+    const dist = new Float64Array(COLS * ROWS).fill(Infinity);
+    if (ok(sx, sy)) {
+      dist[k0] = 0;
+      const heap = [[0, sx, sy]];
+      const up = i => { while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+      const down = i => { for (;;) { const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+        if (m === i) return; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } };
+      while (heap.length) {
+        const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; down(0); }
+        const [d, x, y] = top; if (d > dist[idx(x, y)]) continue;
+        for (const [dx, dy, c] of dirs) {
+          if (!step(x, y, dx, dy)) continue;
+          const k = idx(x + dx, y + dy);
+          if (d + c < dist[k] - 1e-9) { dist[k] = d + c; heap.push([d + c, x + dx, y + dy]); up(heap.length - 1); }
+        }
+      }
+    }
+    if (cache.size > 300) cache.clear();
+    cache.set(k0, dist); return dist;
+  }
+  function route(ax, ay, bx, by) {
+    const f = field(bx, by); if (!isFinite(f[idx(ax, ay)])) return null;
+    const path = [[ax, ay]]; let x = ax, y = ay, guard = 0;
+    while ((x !== bx || y !== by) && guard++ < 5000) {
+      let best = null, bd = Infinity;
+      for (const [dx, dy, c] of dirs) { if (!step(x, y, dx, dy)) continue;
+        const d = c + f[idx(x + dx, y + dy)]; if (d < bd - 1e-9) { bd = d; best = [x + dx, y + dy]; } }
+      if (!best) return null; [x, y] = best; path.push(best);
+    }
+    return path;
+  }
+  return { dist: (a, b) => field(b.x, b.y)[idx(a.x, a.y)], field, route };
+}
+const W = makeField(walkable, DIR8), D = makeField(drivable, DIR4);
+const euclid = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const walkDist = (a, b) => W.dist(a, b);
+const driveDist = (g1, g2) => D.dist({ x: g1.rx, y: g1.ry }, { x: g2.rx, y: g2.ry });
+
+// ---------- shoppers walking between garages and stores ----------
+let seed = 11; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const SHOPPERS = ["Ana", "Ben", "Chloe", "Diego", "Emi", "Farid"].map(name => ({ kind: "shopper", id: name, name, x: 0, y: 0, px: 0, py: 0, path: [] }));
+const spots = () => [...STORES, ...GARAGES];
+function newWalk(s) { const g = spots()[Math.floor(rand() * spots().length)]; s.path = (W.route(s.x, s.y, g.x, g.y) || []).slice(1); }
+SHOPPERS.forEach(s => { const g = spots()[Math.floor(rand() * spots().length)]; s.x = s.px = g.x; s.y = s.py = g.y; newWalk(s); });
+
+// ---------- state ----------
+let from = "store:Food Hall", to = "store:Shoes", car = "P1";
+const garageBy = id => GARAGES.find(g => g.id === id);
+function resolve(key) {
+  const [k, id] = key.split(":");
+  return k === "store" ? STORES.find(s => s.id === id) : k === "garage" ? garageBy(id) : SHOPPERS.find(s => s.id === id);
+}
+
+const fromSel = document.getElementById("fromSel"), toSel = document.getElementById("toSel"), carSel = document.getElementById("carSel");
+const storeOpts = STORES.map(s => `<option value="store:${s.id}">${s.name}</option>`).join("");
+fromSel.innerHTML = `<optgroup label="Stores">${storeOpts}</optgroup><optgroup label="Garages">${GARAGES.map(g => `<option value="garage:${g.id}">Garage ${g.id}</option>`).join("")}</optgroup><optgroup label="Shoppers (moving)">${SHOPPERS.map(s => `<option value="shopper:${s.id}">${s.name}</option>`).join("")}</optgroup>`;
+toSel.innerHTML = storeOpts;
+carSel.innerHTML = GARAGES.map(g => `<option value="${g.id}">Garage ${g.id} (${BLOCK[g.block].toLowerCase()})</option>`).join("");
+function syncSelects() { fromSel.value = from; toSel.value = to; carSel.value = car; }
+fromSel.onchange = () => { from = fromSel.value; refresh(); };
+toSel.onchange = () => { to = toSel.value; refresh(); };
+carSel.onchange = () => { car = carSel.value; refresh(); };
+
+// ---------- the two plans ----------
+const fmtM = c => isFinite(c) ? `${Math.round(c * M)} m` : "no route";
+const fmtMin = m => `${m < 10 ? m.toFixed(1) : Math.round(m)} min`;
+function bestGarageFor(store) {
+  return GARAGES.map(g => ({ g, d: walkDist(g, store) })).sort((a, b) => a.d - b.d)[0].g;
+}
+function plans(a, b, carG) {
+  // Plan A: walk to the store, then walk back to the car
+  const aWalk = walkDist(a, b) + walkDist(b, carG);
+  const A = { walk: aWalk, drive: 0, min: aWalk * M / WALK_M_MIN, legs: [["walk", a, b], ["walk", b, carG]] };
+  // Plan B: walk to the car, drive to the garage closest to the store, walk to the store and back to that garage
+  const g2 = bestGarageFor(b);
+  const bWalk = walkDist(a, carG) + 2 * walkDist(g2, b);
+  const drive = g2 === carG ? 0 : driveDist(carG, g2);
+  const B = { g2, walk: bWalk, drive, min: bWalk * M / WALK_M_MIN + (drive ? drive * M / DRIVE_M_MIN + REPARK_MIN : 0),
+    legs: [["walk", a, carG], ["drive", carG, g2], ["walk", g2, b]] };
+  return { A, B };
+}
+
+// ---------- canvas ----------
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const map = document.getElementById("map"), ctx = map.getContext("2d");
+let cell = 18, C = {};
+const colors = () => { C = Object.fromEntries(["fg","panel","muted","line","plaza","road","roadline","store","anchor","dining","fun","garage","garage-fg","euc","walk","drive","warn"].map(k => [k, css("--" + k)])); };
+function layout() {
+  const w = map.parentElement.clientWidth - 32 || 900;
+  cell = Math.max(7, w / COLS);
+  const dpr = window.devicePixelRatio || 1;
+  map.style.height = `${cell * ROWS}px`;
+  map.width = Math.round(cell * COLS * dpr); map.height = Math.round(cell * ROWS * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+const px = v => (v + 0.5) * cell;
+
+function drawBase() {
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const t = T[y][x];
+    ctx.fillStyle = t === "r" || t === "x" ? C.road : C.plaza;
+    ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
+  }
+  // lane markings
+  ctx.save(); ctx.strokeStyle = C.roadline; ctx.lineWidth = 1; ctx.setLineDash([cell * 0.6, cell * 0.6]);
+  ctx.beginPath();
+  for (const yy of [1, 16, ROWS - 1]) { ctx.moveTo(0, yy * cell); ctx.lineTo(COLS * cell, yy * cell); }
+  for (const xx of [1, 24, COLS - 1]) { ctx.moveTo(xx * cell, 0); ctx.lineTo(xx * cell, ROWS * cell); }
+  ctx.stroke(); ctx.restore();
+  // zebra crosswalks
+  ctx.save(); ctx.fillStyle = C.panel;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (T[y][x] === "x") {
+    const horiz = y === 5 || y === 27;  // crossing the north-south street: stripes run east-west
+    for (let k = 0; k < 4; k++) horiz
+      ? ctx.fillRect(x * cell, y * cell + k * cell / 4 + 1, cell, cell / 8)
+      : ctx.fillRect(x * cell + k * cell / 4 + 1, y * cell, cell / 8, cell);
+  }
+  ctx.restore();
+}
+function label(text, x, y, color, size, weight = 600) {
+  ctx.font = `${weight} ${size}px ${css("--body")}`; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+}
+function wrapLabel(text, rx, ry, rw, rh, color) {
+  const size = Math.max(9, Math.min(cell * 0.62, 14)); ctx.font = `600 ${size}px ${css("--body")}`;
+  const words = text.split(" "), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > rw - 6 && cur) { lines.push(cur); cur = w; } else cur = t; }
+  lines.push(cur);
+  lines.forEach((l, i) => label(l, rx + rw / 2, ry + rh / 2 + (i - (lines.length - 1) / 2) * size * 1.15, color, size));
+}
+function drawBuildings() {
+  for (const s of STORES) {
+    const [x, y, w, h] = s.rect;
+    ctx.fillStyle = C[s.cat]; ctx.fillRect(x * cell + 1, y * cell + 1, w * cell - 2, h * cell - 2);
+    ctx.strokeStyle = C.muted; ctx.lineWidth = 1; ctx.strokeRect(x * cell + 1.5, y * cell + 1.5, w * cell - 3, h * cell - 3);
+    wrapLabel(s.name, x * cell, y * cell, w * cell, h * cell, C.fg);
+    ctx.fillStyle = C.fg; ctx.beginPath(); ctx.arc(px(s.x), px(s.y), cell * 0.18, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const g of GARAGES) {
+    const [x, y, w, h] = g.rect;
+    ctx.fillStyle = C.garage; ctx.fillRect(x * cell + 1, y * cell + 1, w * cell - 2, h * cell - 2);
+    label(g.name, (x + w / 2) * cell, (y + h / 2) * cell, C["garage-fg"], Math.max(12, cell * 1.1), 800);
+    ctx.fillStyle = C.garage; ctx.fillRect(px(g.x) - cell * 0.3, px(g.y) - cell * 0.3, cell * 0.6, cell * 0.6);
+  }
+}
+function drawHeat(src) {
+  if (!src) return;
+  const f = W.field(src.x, src.y); let max = 0;
+  for (let i = 0; i < f.length; i++) if (isFinite(f[i])) max = Math.max(max, f[i]);
+  ctx.save(); ctx.fillStyle = C.walk;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const d = f[idx(x, y)]; if (!isFinite(d)) continue;
+    ctx.globalAlpha = 0.55 * (1 - d / (max + 1)) * (Math.floor(d / 6) % 2 ? 0.7 : 1);
+    ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
+  }
+  ctx.restore();
+}
+function stroke(path, color, width, dash) {
+  if (!path || path.length < 2) return;
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.setLineDash(dash || []);
+  ctx.beginPath(); path.forEach(([x, y], i) => i ? ctx.lineTo(px(x), px(y)) : ctx.moveTo(px(x), px(y))); ctx.stroke(); ctx.restore();
+}
+function marker(p, text, t) {
+  const x = p.kind === "shopper" ? px(p.px + (p.x - p.px) * t) : px(p.x), y = p.kind === "shopper" ? px(p.py + (p.y - p.py) * t) : px(p.y);
+  ctx.save(); ctx.beginPath(); ctx.arc(x, y, cell * 0.8, 0, Math.PI * 2); ctx.lineWidth = 3; ctx.strokeStyle = C.fg; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = `800 ${Math.max(10, cell * 0.6)}px ${css("--display")}`;
+  const w = ctx.measureText(text).width + 10, h = Math.max(15, cell * 0.85);
+  let bx = x + cell * 0.7, by = y - cell * 0.7 - h;
+  if (bx + w > COLS * cell) bx = x - cell * 0.7 - w; if (by < 0) by = y + cell * 0.7;
+  ctx.fillStyle = C.fg; ctx.fillRect(bx, by, w, h); ctx.fillStyle = C.panel; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  ctx.fillText(text, bx + 5, by + h / 2 + 0.5); ctx.restore();
+}
+function drawShoppers(t) {
+  ctx.save(); ctx.font = `700 ${Math.max(8, cell * 0.5)}px ${css("--mono")}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const s of SHOPPERS) {
+    const x = px(s.px + (s.x - s.px) * t), y = px(s.py + (s.y - s.py) * t); s.dx = x; s.dy = y;
+    ctx.beginPath(); ctx.arc(x, y, cell * 0.42, 0, Math.PI * 2); ctx.fillStyle = C.panel; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = C.fg; ctx.stroke(); ctx.fillStyle = C.fg; ctx.fillText(s.name[0], x, y + 0.5);
+  }
+  ctx.restore();
+}
+
+let running = true, acc = 0, last = 0, lastKey = "";
+function draw() {
+  const a = resolve(from), b = resolve(to), carG = garageBy(car), t = running ? Math.min(1, acc / 300) : 1;
+  ctx.clearRect(0, 0, COLS * cell, ROWS * cell);
+  drawBase();
+  const heat = document.getElementById("heat").value;
+  drawHeat(heat === "to" ? b : heat === "car" ? carG : null);
+  drawBuildings();
+  const { A, B } = plans(a, b, carG);
+  const better = B.min < A.min - 0.05 ? "B" : "A";
+  // straight line
+  ctx.save(); ctx.strokeStyle = C.euc; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+  ctx.beginPath(); ctx.moveTo(px(a.x), px(a.y)); ctx.lineTo(px(b.x), px(b.y)); ctx.stroke(); ctx.restore();
+  // plan A walking route (solid) and plan B (re-park) legs
+  const wA = Math.max(3, cell * 0.24), wB = Math.max(2, cell * 0.16);
+  stroke(W.route(a.x, a.y, b.x, b.y), C.walk, better === "A" ? wA : wB, better === "A" ? null : [cell * 0.4, cell * 0.3]);
+  if (B.drive) {
+    stroke(W.route(a.x, a.y, carG.x, carG.y), C.walk, better === "B" ? wA * 0.8 : wB, [cell * 0.3, cell * 0.3]);
+    stroke(D.route(carG.rx, carG.ry, B.g2.rx, B.g2.ry), C.drive, better === "B" ? wA : wB, better === "B" ? null : [cell * 0.4, cell * 0.3]);
+    stroke(W.route(B.g2.x, B.g2.y, b.x, b.y), C.walk, better === "B" ? wA * 0.8 : wB, [cell * 0.3, cell * 0.3]);
+  }
+  drawShoppers(t);
+  // car icon on the parked garage
+  const [gx, gy, gw] = carG.rect;
+  ctx.save(); ctx.fillStyle = C.drive; const cw = cell * 1.6, ch = cell * 0.9, cxp = (gx + gw) * cell - cw - cell * 0.3, cyp = gy * cell + cell * 0.3;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cxp, cyp, cw, ch, 4) : ctx.rect(cxp, cyp, cw, ch); ctx.fill();
+  label("car", cxp + cw / 2, cyp + ch / 2, C.panel, Math.max(8, cell * 0.5), 700); ctx.restore();
+  marker(a, "You", t); marker(b, "Going to", t);
+  const key = [from, to, car, a.x, a.y].join("|");
+  if (key !== lastKey) { lastKey = key; panel(a, b, carG, A, B); }
+}
+
+// ---------- side panels ----------
+function panel(a, b, carG, A, B) {
+  const e = euclid(a, b), w = walkDist(a, b), d = B.drive;
+  const vals = [
+    ["Straight line", "as the crow flies", e, "--euc"],
+    ["Walking", "sidewalks and crosswalks only", w, "--walk"],
+    ["Driving", `garage ${carG.id} → ${B.g2.id}, on the streets`, d, "--drive"],
+  ];
+  const max = Math.max(1, ...vals.map(v => v[2]).filter(isFinite));
+  document.getElementById("bars").innerHTML = vals.map(([n, s, v, c]) => `
+    <div class="bar-row"><span class="bar-name" style="color:var(${c})">${n} <small>${s}</small></span>
+    <span class="bar-val">${v === 0 && c === "--drive" ? "no drive needed" : fmtM(v)}</span>
+    <div class="track"><div class="fill" style="width:${(v / max * 100).toFixed(1)}%;background:var(${c})"></div></div></div>`).join("");
+
+  const flags = [];
+  if (e > 0) {
+    const r = w / e;
+    if (r >= 1.8) flags.push(["warn", `<b>Close in a straight line, far on foot.</b> ${b.name} is only ${fmtM(e)} away in a straight line, but the walk is ${fmtM(w)} (<span class="mono">${r.toFixed(1)}×</span>) because you have to use a crosswalk.`]);
+    else flags.push(["ok", `<b>Fairly direct walk.</b> Walking is <span class="mono">${r.toFixed(2)}×</span> the straight line.`]);
+    if (a.block && b.block && a.block !== b.block) flags.push(["ok", `You are going from the ${BLOCK[a.block].toLowerCase()} to the ${BLOCK[b.block].toLowerCase()}, so you need to cross a street.`]);
+  }
+  document.getElementById("flags").innerHTML = flags.map(([c, h]) => `<div class="flag ${c === "warn" ? "warn" : ""}">${h}</div>`).join("");
+
+  const winB = B.min < A.min - 0.05;
+  const plan = (P, title, sub, win, rows) => `<div class="plan ${win ? "win" : ""}"><h3>${title}${win ? '<span class="tag">Faster</span>' : ""}</h3>
+    <dl>${rows.map(([k, v, cls]) => `<dt>${k}</dt><dd class="${cls || ""}">${v}</dd>`).join("")}</dl><p>${sub}</p></div>`;
+  document.getElementById("plans").innerHTML =
+    plan(A, "Just walk", `Walk to ${b.name}, then walk back to ${carG.id}.`, !winB,
+      [["Walking", fmtM(A.walk)], ["Driving", "0 m"], ["Total time", fmtMin(A.min), "total"]]) +
+    (B.drive
+      ? plan(B, `Move car to ${B.g2.id}`, `Walk to ${carG.id}, drive to ${B.g2.id}, then walk to ${b.name} and back to ${B.g2.id}.`, winB,
+        [["Walking", fmtM(B.walk)], ["Driving", fmtM(B.drive)], ["Total time", fmtMin(B.min), "total"]])
+      : `<div class="plan"><h3>Move the car</h3><p>Your car is already in ${carG.id}, which is the closest garage to ${b.name}. There is nothing to gain by moving it.</p></div>`);
+
+  // garage table
+  const rows = STORES.map(s => { const ds = GARAGES.map(g => walkDist(g, s)); const m = Math.min(...ds); return { s, ds, m }; });
+  document.getElementById("garageTable").innerHTML =
+    `<thead><tr><th>Store</th>${GARAGES.map(g => `<th>${g.id}${g.id === car ? " (car)" : ""}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(({ s, ds, m }) => `<tr data-store="${s.id}" class="${"store:" + s.id === to ? "sel" : ""}"><td>${s.name}</td>${ds.map(d => `<td class="${d === m ? "best" : ""}">${Math.round(d * M)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+}
+document.getElementById("garageTable").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-store]"); if (tr) { to = "store:" + tr.dataset.store; refresh(); }
+});
+
+function buildMismatch() {
+  const pairs = [];
+  for (let i = 0; i < STORES.length; i++) for (let j = i + 1; j < STORES.length; j++) {
+    const a = STORES[i], b = STORES[j], e = euclid(a, b), w = walkDist(a, b);
+    pairs.push({ a, b, e, w, r: w / e });
+  }
+  pairs.sort((x, y) => y.r - x.r);
+  const ul = document.getElementById("mismatch");
+  ul.innerHTML = pairs.slice(0, 5).map(p => `<li data-a="${p.a.id}" data-b="${p.b.id}"><span class="ratio">${p.r.toFixed(1)}×</span><span><b>${p.a.name}</b> to <b>${p.b.name}</b>: ${Math.round(p.e * M)} m in a straight line, ${Math.round(p.w * M)} m on foot.</span></li>`).join("");
+  ul.addEventListener("click", e => { const li = e.target.closest("li"); if (!li) return; from = "store:" + li.dataset.a; to = "store:" + li.dataset.b; refresh(); });
+}
+
+// ---------- interaction & loop ----------
+function refresh() { lastKey = ""; syncSelects(); draw(); }
+map.addEventListener("click", e => {
+  const r = map.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, gx = Math.floor(mx / cell), gy = Math.floor(my / cell);
+  const sh = SHOPPERS.find(s => Math.hypot(s.dx - mx, s.dy - my) < cell * 0.7);
+  if (sh) { from = "shopper:" + sh.id; return refresh(); }
+  const hit = o => { const [x, y, w, h] = o.rect; return gx >= x && gx < x + w && gy >= y && gy < y + h; };
+  const near = o => Math.abs(o.x - gx) <= 1 && Math.abs(o.y - gy) <= 1;
+  const g = GARAGES.find(o => hit(o) || near(o)); if (g) { car = g.id; return refresh(); }
+  const s = STORES.find(o => hit(o) || near(o)); if (s) { if (e.shiftKey) from = "store:" + s.id; else to = "store:" + s.id; refresh(); }
+});
+document.getElementById("heat").onchange = () => draw();
+document.getElementById("play").onclick = e => { running = !running; e.target.textContent = running ? "Pause shoppers" : "Play shoppers"; };
+function frame(now) {
+  if (running) { acc += now - (last || now); if (acc >= 300) { acc %= 300;
+    for (const s of SHOPPERS) { s.px = s.x; s.py = s.y; if (s.path.length) [s.x, s.y] = s.path.shift(); else if (rand() < 0.1) newWalk(s); } } }
+  last = now; draw(); requestAnimationFrame(frame);
+}
+const recolor = () => { colors(); lastKey = ""; draw(); };
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", recolor);
+new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+window.addEventListener("resize", layout);
+document.fonts?.ready.then(layout);
+colors(); syncSelects(); buildMismatch(); layout(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
