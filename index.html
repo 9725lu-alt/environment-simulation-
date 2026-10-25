@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Riverside Distance Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: map on the left, instrument panel on the right; stacks to one column on phones. */
+:root {
+  --bg: #eef2ee; --panel: #ffffff; --fg: #1b2420; --muted: #5a6a62; --line: #d3dcd6;
+  --grass: #e4ece0; --grass2: #dfe8da; --water: #93c1dc; --bridge: #c4a272; --wall: #545b60; --gate: #b9c4bd;
+  --euc: #c2367a; --man: #b8710a; --walk: #13806f; --warn: #b42318; --warn-bg: #fdecea; --ok-bg: #e6f4ef;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111613; --panel: #19201c; --fg: #e3ebe5; --muted: #94a59b; --line: #2b3530;
+  --grass: #1d2721; --grass2: #1b251f; --water: #22506b; --bridge: #8a6a42; --wall: #8d969c; --gate: #3c4842;
+  --euc: #f06aa9; --man: #f0a53a; --walk: #3cc8b1; --warn: #ff8a80; --warn-bg: #3a1d1b; --ok-bg: #16302a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111613; --panel: #19201c; --fg: #e3ebe5; --muted: #94a59b; --line: #2b3530;
+  --grass: #1d2721; --grass2: #1b251f; --water: #22506b; --bridge: #8a6a42; --wall: #8d969c; --gate: #3c4842;
+  --euc: #f06aa9; --man: #f0a53a; --walk: #3cc8b1; --warn: #ff8a80; --warn-bg: #3a1d1b; --ok-bg: #16302a; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body) }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 20px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 14px }
+h1 { font: 800 clamp(24px, 4vw, 34px)/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.lede { color: var(--muted); margin: 4px 0 0; max-width: 70ch }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted) }
+.legend span { display: inline-flex; align-items: center; gap: 6px }
+.sw { width: 18px; height: 4px; border-radius: 2px; display: inline-block }
+.grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 18px; align-items: start }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0 }
+.side { display: grid; gap: 14px; min-width: 0 }
+h2 { font: 600 13px/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px }
+#map { display: block; width: 100%; height: auto; border-radius: 6px; cursor: crosshair; touch-action: manipulation }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 12px; font-size: 14px }
+.controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted) }
+select, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px }
+button { cursor: pointer }
+button:hover, select:hover { border-color: var(--muted) }
+:focus-visible { outline: 2px solid var(--walk); outline-offset: 2px }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 5px 10px }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--panel) }
+.hint { font-size: 13px; color: var(--muted); margin: 10px 0 0 }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.pair label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em }
+.pair select { width: 100%; text-transform: none; letter-spacing: 0 }
+.bars { display: grid; gap: 12px; margin-top: 14px }
+.bar-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline }
+.bar-name { font-weight: 700 }
+.bar-name small { font-weight: 400; color: var(--muted) }
+.bar-val { font: 600 15px var(--mono); font-variant-numeric: tabular-nums; text-align: right }
+.track { grid-column: 1 / -1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden }
+.fill { height: 100%; border-radius: 5px; transition: width .25s ease }
+.flags { display: grid; gap: 8px; margin-top: 14px }
+.flag { font-size: 14px; padding: 8px 10px; border-radius: 6px; background: var(--ok-bg) }
+.flag.warn { background: var(--warn-bg) }
+.flag b { color: var(--fg) }
+.flag.warn b { color: var(--warn) }
+#scatter { display: block; width: 100%; height: auto }
+.mismatch { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; font-size: 14px }
+.mismatch li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: baseline }
+.ratio { font: 600 13px var(--mono); color: var(--warn); font-variant-numeric: tabular-nums; min-width: 4.2em }
+code, .mono { font-family: var(--mono); font-size: 0.9em }
+details { margin-top: 18px }
+summary { cursor: pointer; font: 600 15px var(--display) }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 10px; font-size: 14px }
+.notes p { margin: 4px 0 0; color: var(--muted) }
+@media (prefers-reduced-motion: reduce) { .fill { transition: none } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Riverside Distance Lab</h1>
+    <p class="lede">A small riverside town with walls, buildings and two bridges. Eight occupants walk between places. Pick any two locations or occupants and compare three ways of measuring how far apart they are.</p>
+  </div>
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw" style="background:var(--euc)"></i>Straight line</span>
+    <span><i class="sw" style="background:var(--man)"></i>City block</span>
+    <span><i class="sw" style="background:var(--walk)"></i>Walking path</span>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="panel" aria-label="Map">
+    <canvas id="map" width="880" height="560"></canvas>
+    <div class="controls">
+      <span class="seg" role="group" aria-label="Clicking the map sets">
+        <button id="clickFrom" aria-pressed="true">Click sets From</button>
+        <button id="clickTo" aria-pressed="false">Click sets To</button>
+      </span>
+      <label for="heat">Heatmap from “From”
+        <select id="heat">
+          <option value="none">Off</option>
+          <option value="euc">Straight line</option>
+          <option value="man">City block</option>
+          <option value="walk" selected>Walking path</option>
+        </select>
+      </label>
+      <button id="play">Pause</button>
+      <button id="shuffle">New walks</button>
+    </div>
+    <p class="hint">Click an occupant (circle), a place (square) or any open ground. A selected occupant is tracked as they walk, so the distances update live. One cell is 10&nbsp;m.</p>
+  </section>
+
+  <div class="side">
+    <section class="panel" aria-label="Distance between the two points">
+      <h2>Distance</h2>
+      <div class="pair">
+        <label for="fromSel">From<select id="fromSel"></select></label>
+        <label for="toSel">To<select id="toSel"></select></label>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="flags" id="flags" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-label="Far by one metric, close by another">
+      <h2>Close by one metric, far by another</h2>
+      <canvas id="scatter" width="420" height="260" aria-label="Scatter of straight-line distance against walking distance"></canvas>
+      <ul class="mismatch" id="mismatch"></ul>
+    </section>
+  </div>
+</div>
+
+<details>
+  <summary>How each distance is measured, and why it is a metric</summary>
+  <div class="notes">
+    <div><b style="color:var(--euc)">Straight line (Euclidean)</b>
+      <p><code>d = √(Δx² + Δy²)</code>. This is distance as the crow flies, which ignores walls and water. It is a metric: never negative, zero only for the same cell, symmetric, and the straight segment is the shortest curve, so the triangle inequality holds.</p></div>
+    <div><b style="color:var(--man)">City block (Manhattan)</b>
+      <p><code>d = |Δx| + |Δy|</code>. You may only move along the grid axes, like streets. Each coordinate term is a metric on its own, and a sum of metrics is a metric. It is always between 1× and √2× the straight line.</p></div>
+    <div><b style="color:var(--walk)">Walking path (shortest route, bonus)</b>
+      <p>The shortest route through walkable cells, 8 directions, with diagonals costing √2 and no corner cutting. It is computed with Dijkstra’s algorithm. Every step is reversible, so it is symmetric. Joining a route A→C to a route C→B gives a route A→B, so the triangle inequality holds. It is never shorter than the straight line.</p></div>
+  </div>
+</details>
+</div>
+
+<script>
+(() => {
+"use strict";
+const COLS = 44, ROWS = 28, M_PER_CELL = 10;
+const SQRT2 = Math.SQRT2;
+
+// ---------- seeded RNG so the town is the same every visit ----------
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let rand = mulberry32(7);
+
+// ---------- terrain: '.' grass, 'w' water, 'b' bridge, '#' wall/building ----------
+const T = Array.from({ length: ROWS }, () => Array(COLS).fill("."));
+const inside = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+const riverX = y => 22 + Math.round(3 * Math.sin(y / 4));
+for (let y = 0; y < ROWS; y++) for (let dx = -1; dx <= 1; dx++) T[y][riverX(y) + dx] = "w";
+for (const by of [5, 22]) for (let dx = -1; dx <= 1; dx++) T[by][riverX(by) + dx] = "b";
+const block = (x, y, w, h) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (inside(i, j)) T[j][i] = "#"; };
+const outline = (x, y, w, h) => { for (let i = x; i < x + w; i++) { T[y][i] = "#"; T[y + h - 1][i] = "#"; }
+  for (let j = y; j < y + h; j++) { T[j][x] = "#"; T[j][x + w - 1] = "#"; } };
+// walled library garden with a single gate on its south-west corner
+outline(3, 2, 13, 10); T[11][5] = "."; T[11][6] = ".";
+block(7, 5, 4, 3);                      // library building inside the garden
+block(27, 2, 5, 5); block(34, 2, 7, 3); // east-bank blocks
+block(27, 10, 4, 7); block(34, 9, 7, 4);
+block(26, 19, 13, 2);                    // long wall along the south-east
+block(3, 16, 6, 4); block(11, 18, 5, 6); block(35, 15, 2, 4);
+
+const blocked = (x, y) => !inside(x, y) || T[y][x] === "#" || T[y][x] === "w";
+
+// ---------- places ----------
+function nearestOpen(x, y) {
+  if (!blocked(x, y)) return [x, y];
+  for (let r = 1; r < 10; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+    if (!blocked(x + dx, y + dy)) return [x + dx, y + dy];
+  return [x, y];
+}
+const PLACES = [
+  ["Library", 9, 9], ["Café", 17, 7], ["Boathouse", 18, 13], ["Pier", 25, 13], ["Lab", 32, 8],
+  ["Gym", 12, 15], ["Market", 32, 17], ["Dorm", 6, 24], ["Park", 39, 24], ["Station", 41, 6],
+].map(([name, x, y]) => { const [cx, cy] = nearestOpen(x, y); return { kind: "place", id: name, name, x: cx, y: cy }; });
+
+// ---------- Dijkstra over walkable cells (8 directions, no corner cutting) ----------
+const DIRS = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,SQRT2],[1,-1,SQRT2],[-1,1,SQRT2],[-1,-1,SQRT2]];
+const idx = (x, y) => y * COLS + x;
+function canStep(x, y, dx, dy) {
+  if (blocked(x + dx, y + dy)) return false;
+  if (dx && dy && (blocked(x + dx, y) || blocked(x, y + dy))) return false;
+  return true;
+}
+const fieldCache = new Map();
+function walkField(sx, sy) {
+  const key = idx(sx, sy);
+  if (fieldCache.has(key)) return fieldCache.get(key);
+  const dist = new Float64Array(COLS * ROWS).fill(Infinity);
+  if (blocked(sx, sy)) { fieldCache.set(key, dist); return dist; }
+  dist[key] = 0;
+  const heap = [[0, sx, sy]];
+  const push = n => { heap.push(n); let i = heap.length - 1;
+    while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop();
+    if (heap.length) { heap[0] = last; let i = 0;
+      for (;;) { const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+        if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } }
+    return top; };
+  while (heap.length) {
+    const [d, x, y] = pop();
+    if (d > dist[idx(x, y)]) continue;
+    for (const [dx, dy, c] of DIRS) {
+      if (!canStep(x, y, dx, dy)) continue;
+      const k = idx(x + dx, y + dy), nd = d + c;
+      if (nd < dist[k] - 1e-9) { dist[k] = nd; push([nd, x + dx, y + dy]); }
+    }
+  }
+  if (fieldCache.size > 400) fieldCache.clear();
+  fieldCache.set(key, dist);
+  return dist;
+}
+// Route from (ax,ay) to (bx,by): descend the distance field rooted at B.
+function route(ax, ay, bx, by) {
+  const f = walkField(bx, by);
+  if (!isFinite(f[idx(ax, ay)])) return null;
+  const path = [[ax, ay]]; let x = ax, y = ay;
+  while (x !== bx || y !== by) {
+    let best = null, bestD = Infinity;
+    for (const [dx, dy, c] of DIRS) {
+      if (!canStep(x, y, dx, dy)) continue;
+      const d = c + f[idx(x + dx, y + dy)];
+      if (d < bestD - 1e-9) { bestD = d; best = [x + dx, y + dy]; }
+    }
+    if (!best) return null;
+    [x, y] = best; path.push(best);
+  }
+  return path;
+}
+
+// ---------- the three metrics (in cells) ----------
+const metrics = {
+  euc:  { label: "Straight line", note: "as the crow flies", color: "--euc",
+          d: (a, b) => Math.hypot(a.x - b.x, a.y - b.y) },
+  man:  { label: "City block", note: "grid axes only", color: "--man",
+          d: (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) },
+  walk: { label: "Walking path", note: "around walls and water", color: "--walk",
+          d: (a, b) => walkField(b.x, b.y)[idx(a.x, a.y)] },
+};
+
+// Does the straight segment cross a wall or water? Sample along the line.
+function sightBlockers(a, b) {
+  const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) * 4) || 1;
+  const hit = new Set();
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(a.x + (b.x - a.x) * i / n), y = Math.round(a.y + (b.y - a.y) * i / n);
+    if (T[y][x] === "#") hit.add("a wall"); else if (T[y][x] === "w") hit.add("the river");
+  }
+  return [...hit];
+}
+
+// ---------- occupants ----------
+const NAMES = ["Ada", "Bo", "Cyd", "Dev", "Eli", "Fay", "Gus", "Ivy"];
+const agents = NAMES.map(name => ({ kind: "agent", id: name, name, x: 0, y: 0, px: 0, py: 0, path: [], goal: null }));
+function assignWalk(a) {
+  const goal = PLACES[Math.floor(rand() * PLACES.length)];
+  a.goal = goal;
+  a.path = (route(a.x, a.y, goal.x, goal.y) || [[a.x, a.y]]).slice(1);
+}
+function scatterAgents() {
+  agents.forEach(a => { const p = PLACES[Math.floor(rand() * PLACES.length)];
+    a.x = a.px = p.x; a.y = a.py = p.y; assignWalk(a); });
+}
+scatterAgents();
+// a fixed starting story: Ada stands on the Boathouse, Bo on the Pier straight across the river
+Object.assign(agents[0], { x: PLACES[2].x, y: PLACES[2].y, px: PLACES[2].x, py: PLACES[2].y, path: [] });
+Object.assign(agents[1], { x: PLACES[3].x, y: PLACES[3].y, px: PLACES[3].x, py: PLACES[3].y, path: [] });
+
+// ---------- selection ----------
+let from = { kind: "place", id: "Library" }, to = { kind: "place", id: "Café" };
+let clickTarget = "from";
+function resolve(sel) {
+  if (sel.kind === "place") return PLACES.find(p => p.id === sel.id);
+  if (sel.kind === "agent") return agents.find(a => a.id === sel.id);
+  const [x, y] = sel.id.split(",").map(Number);
+  return { kind: "cell", id: sel.id, name: `Ground (${x}, ${y})`, x, y };
+}
+const selKey = s => `${s.kind}:${s.id}`;
+
+const fromSel = document.getElementById("fromSel"), toSel = document.getElementById("toSel");
+function fillSelect(el, current) {
+  const cur = resolve(current);
+  let html = `<optgroup label="Places">${PLACES.map(p => `<option value="place:${p.id}">${p.name}</option>`).join("")}</optgroup>`;
+  html += `<optgroup label="Occupants">${agents.map(a => `<option value="agent:${a.id}">${a.name} (occupant)</option>`).join("")}</optgroup>`;
+  if (current.kind === "cell") html += `<option value="cell:${current.id}">${cur.name}</option>`;
+  el.innerHTML = html; el.value = selKey(current);
+}
+function parseSel(v) { const [kind, id] = v.split(":"); return { kind, id }; }
+fromSel.addEventListener("change", () => { from = parseSel(fromSel.value); invalidate(); });
+toSel.addEventListener("change", () => { to = parseSel(toSel.value); invalidate(); });
+
+// ---------- drawing helpers ----------
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const map = document.getElementById("map"), ctx = map.getContext("2d");
+let cell = 20;
+function sizeCanvas(c, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function layout() {
+  const w = map.parentElement.clientWidth - 32 || 880;
+  cell = Math.max(7, w / COLS);
+  map.style.height = `${cell * ROWS}px`;
+  sizeCanvas(map, cell * COLS, cell * ROWS);
+  const sw = scatter.parentElement.clientWidth - 32 || 380;
+  scatter.style.height = `${Math.round(sw * 0.62)}px`;
+  sizeCanvas(scatter, sw, Math.round(sw * 0.62));
+  dirty = true; draw();
+}
+const cx = v => (v + 0.5) * cell;
+
+function drawTerrain(C) {
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const t = T[y][x];
+    ctx.fillStyle = t === "#" ? C.wall : t === "w" ? C.water : t === "b" ? C.bridge : ((x + y) % 2 ? C.grass : C.grass2);
+    ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
+  }
+}
+function drawHeat(C, mode, a) {
+  if (mode === "none" || !a) return;
+  const f = mode === "walk" ? walkField(a.x, a.y) : null;
+  const col = C[mode];
+  let max = 0; const vals = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const p = { x, y }, d = blocked(x, y) ? Infinity : (f ? f[idx(x, y)] : metrics[mode].d(a, p));
+    vals.push(d); if (isFinite(d)) max = Math.max(max, d);
+  }
+  ctx.save();
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const d = vals[idx(x, y)]; if (!isFinite(d)) continue;
+    const band = Math.floor(d / 5);
+    ctx.globalAlpha = 0.5 * (1 - d / (max + 1)) * (band % 2 ? 0.75 : 1);
+    ctx.fillStyle = col; ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
+  }
+  ctx.restore();
+}
+function drawPaths(C, a, b, walkPath) {
+  if (!a || !b) return;
+  ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+  // city block: horizontal then vertical
+  ctx.strokeStyle = C.man; ctx.lineWidth = Math.max(2, cell * 0.14); ctx.setLineDash([cell * 0.5, cell * 0.3]);
+  ctx.beginPath(); ctx.moveTo(cx(a.x), cx(a.y)); ctx.lineTo(cx(b.x), cx(a.y)); ctx.lineTo(cx(b.x), cx(b.y)); ctx.stroke();
+  // straight line
+  ctx.strokeStyle = C.euc; ctx.setLineDash([cell * 0.25, cell * 0.25]); ctx.lineWidth = Math.max(2, cell * 0.14);
+  ctx.beginPath(); ctx.moveTo(cx(a.x), cx(a.y)); ctx.lineTo(cx(b.x), cx(b.y)); ctx.stroke();
+  // walking route
+  if (walkPath) {
+    ctx.setLineDash([]); ctx.strokeStyle = C.walk; ctx.lineWidth = Math.max(3, cell * 0.24);
+    ctx.beginPath(); walkPath.forEach(([x, y], i) => i ? ctx.lineTo(cx(x), cx(y)) : ctx.moveTo(cx(x), cx(y))); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawPlaces(C) {
+  ctx.save();
+  ctx.font = `600 ${Math.max(10, cell * 0.55)}px ${css("--body")}`;
+  ctx.textBaseline = "bottom";
+  for (const p of PLACES) {
+    const s = cell * 0.7;
+    ctx.fillStyle = C.fg; ctx.fillRect(cx(p.x) - s / 2, cx(p.y) - s / 2, s, s);
+    ctx.fillStyle = C.panel; ctx.fillRect(cx(p.x) - s / 4, cx(p.y) - s / 4, s / 2, s / 2);
+    const tw = ctx.measureText(p.name).width;
+    let tx = cx(p.x) - tw / 2; tx = Math.min(Math.max(2, tx), COLS * cell - tw - 2);
+    ctx.lineWidth = 3; ctx.strokeStyle = C.panel; ctx.strokeText(p.name, tx, cx(p.y) - s / 2 - 2);
+    ctx.fillStyle = C.fg; ctx.fillText(p.name, tx, cx(p.y) - s / 2 - 2);
+  }
+  ctx.restore();
+}
+function drawAgents(C, t) {
+  ctx.save();
+  ctx.font = `700 ${Math.max(9, cell * 0.5)}px ${css("--mono")}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const a of agents) {
+    const x = cx(a.px + (a.x - a.px) * t), y = cx(a.py + (a.y - a.py) * t);
+    a.drawX = x; a.drawY = y;
+    ctx.beginPath(); ctx.arc(x, y, cell * 0.48, 0, Math.PI * 2);
+    ctx.fillStyle = C.panel; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.fg; ctx.stroke();
+    ctx.fillStyle = C.fg; ctx.fillText(a.name[0], x, y + 0.5);
+  }
+  ctx.restore();
+}
+function drawMarker(C, p, label, t) {
+  if (!p) return;
+  let x = cx(p.x), y = cx(p.y);
+  if (p.kind === "agent") { x = p.drawX ?? x; y = p.drawY ?? y; }
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, cell * 0.85, 0, Math.PI * 2);
+  ctx.lineWidth = 3; ctx.strokeStyle = C.fg; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = `800 ${Math.max(10, cell * 0.55)}px ${css("--display")}`;
+  const w = ctx.measureText(label).width + 10, h = Math.max(14, cell * 0.8);
+  let bx = x + cell * 0.7, by = y + cell * 0.55;
+  if (bx + w > COLS * cell) bx = x - cell * 0.7 - w;
+  if (by + h > ROWS * cell) by = y - cell * 0.55 - h;
+  ctx.fillStyle = C.fg; ctx.fillRect(bx, by, w, h);
+  ctx.fillStyle = C.panel; ctx.textBaseline = "middle"; ctx.fillText(label, bx + 5, by + h / 2 + 0.5);
+  ctx.restore();
+}
+
+// ---------- side panel ----------
+const fmt = c => isFinite(c) ? `${Math.round(c * M_PER_CELL)} m` : "no route";
+function updatePanel(a, b, C) {
+  const vals = { euc: metrics.euc.d(a, b), man: metrics.man.d(a, b), walk: metrics.walk.d(a, b) };
+  const max = Math.max(1, ...Object.values(vals).filter(isFinite));
+  document.getElementById("bars").innerHTML = Object.entries(metrics).map(([k, m]) => `
+    <div class="bar-row"><span class="bar-name" style="color:var(${m.color})">${m.label} <small>${m.note}</small></span>
+    <span class="bar-val">${fmt(vals[k])}</span>
+    <div class="track"><div class="fill" style="width:${isFinite(vals[k]) ? (vals[k] / max * 100).toFixed(1) : 0}%;background:var(${m.color})"></div></div></div>`).join("");
+
+  const flags = [];
+  if (vals.euc === 0) flags.push(["ok", `<b>Same spot.</b> Every metric gives 0, as a metric must when both points are the same.`]);
+  else {
+    const detour = vals.walk / vals.euc, blockers = sightBlockers(a, b);
+    if (!isFinite(vals.walk)) flags.push(["warn", `<b>No walking route.</b> The straight-line distance is ${fmt(vals.euc)}, but you cannot get there on foot.`]);
+    else if (detour >= 2) flags.push(["warn", `<b>Close in a straight line, far on foot.</b> ${a.name} and ${b.name} are ${fmt(vals.euc)} apart in a straight line but ${fmt(vals.walk)} on foot. The walk is <span class="mono">${detour.toFixed(1)}×</span> longer.`]);
+    else if (detour >= 1.3) flags.push(["warn", `<b>Noticeable detour.</b> Walking is <span class="mono">${detour.toFixed(2)}×</span> the straight line.`]);
+    else flags.push(["ok", `<b>Almost a straight walk.</b> Walking is only <span class="mono">${detour.toFixed(2)}×</span> the straight line, so the metrics roughly agree here.`]);
+    if (blockers.length) flags.push(["warn", `<b>No line of sight.</b> The straight line crosses ${blockers.join(" and ")}.`]);
+    flags.push(["ok", `City block ÷ straight line = <span class="mono">${(vals.man / vals.euc).toFixed(2)}×</span>. This ratio is always between 1 and √2 ≈ 1.41, so these two metrics never disagree by much.`]);
+  }
+  document.getElementById("flags").innerHTML = flags.map(([c, h]) => `<div class="flag ${c === "warn" ? "warn" : ""}">${h}</div>`).join("");
+  drawScatter(a, C);
+}
+
+const scatter = document.getElementById("scatter"), sctx = scatter.getContext("2d");
+function drawScatter(a, C) {
+  const W = scatter.clientWidth, H = scatter.clientHeight;
+  sctx.clearRect(0, 0, W, H);
+  const pts = [...PLACES, ...agents].filter(p => p !== a && !(p.x === a.x && p.y === a.y && p.kind === a.kind))
+    .map(p => ({ p, e: metrics.euc.d(a, p) * M_PER_CELL, w: metrics.walk.d(a, p) * M_PER_CELL }))
+    .filter(o => o.e > 0 && isFinite(o.w));
+  const max = Math.max(100, ...pts.map(o => Math.max(o.e, o.w))) * 1.05;
+  const L = 44, R = 10, Tp = 10, B = 34, pw = W - L - R, ph = H - Tp - B;
+  const X = v => L + v / max * pw, Y = v => Tp + ph - v / max * ph;
+  sctx.font = `11px ${css("--mono")}`; sctx.fillStyle = C.muted; sctx.strokeStyle = C.line; sctx.lineWidth = 1;
+  const step = max > 400 ? 200 : 100;
+  for (let v = 0; v <= max; v += step) {
+    sctx.beginPath(); sctx.moveTo(X(v), Tp); sctx.lineTo(X(v), Tp + ph); sctx.moveTo(L, Y(v)); sctx.lineTo(L + pw, Y(v)); sctx.stroke();
+    sctx.textAlign = "center"; sctx.textBaseline = "top"; sctx.fillText(v, X(v), Tp + ph + 4);
+    sctx.textAlign = "right"; sctx.textBaseline = "middle"; sctx.fillText(v, L - 6, Y(v));
+  }
+  sctx.textAlign = "center"; sctx.textBaseline = "bottom"; sctx.fillStyle = C.euc;
+  sctx.fillText("straight line (m)", L + pw / 2, H);
+  sctx.save(); sctx.translate(11, Tp + ph / 2); sctx.rotate(-Math.PI / 2); sctx.textBaseline = "middle"; sctx.fillStyle = C.walk;
+  sctx.fillText("walking (m)", 0, 0); sctx.restore();
+  // y = x reference and y = 2x warning zone
+  sctx.fillStyle = C.warn; sctx.globalAlpha = 0.08;
+  sctx.beginPath(); sctx.moveTo(X(0), Y(0)); sctx.lineTo(X(max / 2), Y(max)); sctx.lineTo(X(0), Y(max)); sctx.closePath(); sctx.fill();
+  sctx.globalAlpha = 1; sctx.strokeStyle = C.muted; sctx.setLineDash([4, 4]);
+  sctx.beginPath(); sctx.moveTo(X(0), Y(0)); sctx.lineTo(X(max), Y(max)); sctx.stroke(); sctx.setLineDash([]);
+  sctx.fillStyle = C.muted; sctx.textAlign = "left"; sctx.textBaseline = "top";
+  sctx.fillText("walk = straight", X(max * 0.62) + 4, Y(max * 0.62) + 2);
+  sctx.fillStyle = C.warn; sctx.fillText("walk ≥ 2× straight", X(0) + 6, Tp + 4);
+  const target = resolve(to);
+  for (const o of pts) {
+    const bad = o.w >= 2 * o.e, isTo = target && o.p.kind === target.kind && o.p.id === target.id;
+    sctx.beginPath();
+    if (o.p.kind === "place") sctx.rect(X(o.e) - 4, Y(o.w) - 4, 8, 8); else sctx.arc(X(o.e), Y(o.w), 4.5, 0, Math.PI * 2);
+    sctx.fillStyle = bad ? C.warn : C.walk; sctx.fill();
+    if (isTo) { sctx.lineWidth = 2; sctx.strokeStyle = C.fg; sctx.stroke(); }
+    if (bad || isTo) { sctx.fillStyle = C.fg; sctx.textAlign = "left"; sctx.textBaseline = "middle"; sctx.font = `11px ${css("--body")}`;
+      const tx = X(o.e) + 7; sctx.textAlign = tx > L + pw - 60 ? "right" : "left";
+      sctx.fillText(o.p.name, sctx.textAlign === "right" ? X(o.e) - 7 : tx, Y(o.w)); sctx.font = `11px ${css("--mono")}`; }
+  }
+  const worst = pts.map(o => ({ ...o, r: o.w / o.e })).filter(o => o.r >= 1.6).sort((x, y) => y.r - x.r).slice(0, 4);
+  document.getElementById("mismatch").innerHTML = worst.length
+    ? worst.map(o => `<li><span class="ratio">${o.r.toFixed(1)}×</span><span><b>${o.p.name}</b> is ${Math.round(o.e)} m from ${a.name} in a straight line, but ${Math.round(o.w)} m on foot.</span></li>`).join("")
+    : `<li><span class="ratio">—</span><span>Nobody is much farther on foot than in a straight line from ${a.name} right now.</span></li>`;
+}
+
+// ---------- main loop ----------
+let running = true, last = performance.now(), acc = 0, dirty = true;
+const STEP_MS = 260;
+function colors() {
+  return { fg: css("--fg"), panel: css("--panel"), muted: css("--muted"), line: css("--line"), grass: css("--grass"), grass2: css("--grass2"),
+    water: css("--water"), bridge: css("--bridge"), wall: css("--wall"), euc: css("--euc"), man: css("--man"), walk: css("--walk"), warn: css("--warn") };
+}
+let C = colors();
+function invalidate() { dirty = true; fillSelect(fromSel, from); fillSelect(toSel, to); draw(); }
+function stepAgents() {
+  for (const a of agents) {
+    a.px = a.x; a.py = a.y;
+    if (!a.path.length) { if (rand() < 0.15) assignWalk(a); continue; }
+    const [nx, ny] = a.path.shift(); a.x = nx; a.y = ny;
+  }
+  dirty = true;
+}
+let lastPanelKey = "";
+function draw() {
+  const t = Math.min(1, acc / STEP_MS);
+  const a = resolve(from), b = resolve(to);
+  ctx.clearRect(0, 0, COLS * cell, ROWS * cell);
+  drawTerrain(C);
+  drawHeat(C, document.getElementById("heat").value, a);
+  drawPaths(C, a, b, a && b ? route(a.x, a.y, b.x, b.y) : null);
+  drawPlaces(C);
+  drawAgents(C, running ? t : 1);
+  drawMarker(C, a, "From", t); drawMarker(C, b, "To", t);
+  const key = `${a.x},${a.y}|${b.x},${b.y}|${agents.map(g => g.x + "," + g.y).join(";")}`;
+  if (dirty || key !== lastPanelKey) { updatePanel(a, b, C); lastPanelKey = key; dirty = false; }
+}
+function frame(now) {
+  if (running) { acc += now - last; if (acc >= STEP_MS) { acc %= STEP_MS; stepAgents(); } }
+  last = now; draw(); requestAnimationFrame(frame);
+}
+
+// ---------- input ----------
+const setClick = which => { clickTarget = which;
+  document.getElementById("clickFrom").setAttribute("aria-pressed", which === "from");
+  document.getElementById("clickTo").setAttribute("aria-pressed", which === "to"); };
+document.getElementById("clickFrom").onclick = () => setClick("from");
+document.getElementById("clickTo").onclick = () => setClick("to");
+document.getElementById("heat").onchange = () => draw();
+document.getElementById("play").onclick = e => { running = !running; e.target.textContent = running ? "Pause" : "Play"; };
+document.getElementById("shuffle").onclick = () => { agents.forEach(assignWalk); dirty = true; };
+map.addEventListener("click", e => {
+  const r = map.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const gx = Math.floor(mx / cell), gy = Math.floor(my / cell);
+  let pick = null;
+  const ag = agents.find(a => Math.hypot((a.drawX ?? cx(a.x)) - mx, (a.drawY ?? cx(a.y)) - my) < cell * 0.7);
+  if (ag) pick = { kind: "agent", id: ag.id };
+  else { const pl = PLACES.find(p => Math.abs(p.x - gx) <= 0 && Math.abs(p.y - gy) <= 0) || PLACES.find(p => Math.hypot(cx(p.x) - mx, cx(p.y) - my) < cell * 0.8);
+    if (pl) pick = { kind: "place", id: pl.id };
+    else if (!blocked(gx, gy)) pick = { kind: "cell", id: `${gx},${gy}`, x: gx, y: gy };
+  }
+  if (!pick) return;
+  if (clickTarget === "from") { from = pick; setClick("to"); } else { to = pick; setClick("from"); }
+  invalidate();
+});
+const mq = matchMedia("(prefers-color-scheme: dark)");
+const recolor = () => { C = colors(); dirty = true; draw(); };
+mq.addEventListener?.("change", recolor);
+new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+window.addEventListener("resize", layout);
+document.fonts?.ready.then(layout);
+
+// opening story: Library vs Café sit on either side of the garden wall
+fillSelect(fromSel, from); fillSelect(toSel, to);
+layout();
+requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
+})();
+</script>
+</body>
+</html>
