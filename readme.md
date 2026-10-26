@@ -28,6 +28,7 @@ Good examples: Library → Café (separated by the garden wall), Boathouse → P
 
 - Four blocks separated by streets. Pedestrians may only cross at crosswalks, and each block has its own parking garage (P1 to P4).
 - Three metrics: straight line, walking (sidewalks and crosswalks, Dijkstra), and driving (street network between garages).
+- Driving follows right-hand traffic: each lane flows one way and cars turn only at intersections, except that a car entering or leaving a garage may cut straight across the road. Because of one-way lanes, driving A → B can differ from B → A, so driving distance is a quasi-metric (it fails symmetry). The page flags this.
 - **Walk or move the car?** For a trip from where you are to a store, it compares *just walking* (there, then back to your car) with *re-parking* (walk to your car, drive to the garage closest to the store, walk there and back). It shows walking meters, driving meters and total time, assuming 80 m/min walking, 300 m/min driving and 4 min per re-park.
 - A table shows the walking distance from every garage to every store and highlights the best garage for each one.
 - A list ranks the store pairs that are close in a straight line but far on foot, usually because there is no crosswalk nearby.

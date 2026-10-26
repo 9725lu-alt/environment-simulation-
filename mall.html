@@ -13,7 +13,7 @@
 :root {
   --bg: #f2f1ee; --panel: #ffffff; --fg: #1f2124; --muted: #62666c; --line: #d8d7d2;
   --plaza: #ebe8e1; --road: #8a8f96; --roadline: #f2f1ee; --store: #d9d4c7; --anchor: #c7bfae; --dining: #e3cfb4; --fun: #cdd3dd;
-  --garage: #3d4248; --garage-fg: #ffffff;
+  --garage: #3d4248; --garage-fg: #ffffff; --center: #e3b341;
   --euc: #c2367a; --walk: #13806f; --drive: #2f5fd0; --warn: #b42318; --warn-bg: #fdecea; --ok-bg: #e5f3ee; --best: #d7efe6;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
@@ -22,12 +22,12 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #131416; --panel: #1b1d20; --fg: #e7e8ea; --muted: #9a9fa6; --line: #2e3136;
   --plaza: #24262a; --road: #44484e; --roadline: #6d727a; --store: #3a3833; --anchor: #4a453b; --dining: #4d4234; --fun: #353b46;
-  --garage: #c9ced4; --garage-fg: #15171a;
+  --garage: #c9ced4; --garage-fg: #15171a; --center: #b8902a;
   --euc: #f06aa9; --walk: #3cc8b1; --drive: #7aa2ff; --warn: #ff8a80; --warn-bg: #3a1d1b; --ok-bg: #16302a; --best: #1c3a31; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #131416; --panel: #1b1d20; --fg: #e7e8ea; --muted: #9a9fa6; --line: #2e3136;
   --plaza: #24262a; --road: #44484e; --roadline: #6d727a; --store: #3a3833; --anchor: #4a453b; --dining: #4d4234; --fun: #353b46;
-  --garage: #c9ced4; --garage-fg: #15171a;
+  --garage: #c9ced4; --garage-fg: #15171a; --center: #b8902a;
   --euc: #f06aa9; --walk: #3cc8b1; --drive: #7aa2ff; --warn: #ff8a80; --warn-bg: #3a1d1b; --ok-bg: #16302a; --best: #1c3a31; color-scheme: dark }
 
 * { box-sizing: border-box }
@@ -126,7 +126,7 @@ a { color: var(--drive) }
       </label>
       <button id="play">Pause shoppers</button>
     </div>
-    <p class="hint">Click a store to go there. Click a garage (P1 to P4) to park there. Shift-click a store, or click a shopper, to set where you are now. The layout is simplified for teaching. Store and garage positions are illustrative, not the real floor plan. One cell is 10&nbsp;m.</p>
+    <p class="hint">Click a store to go there. Click a garage (P1 to P4) to park there. Shift-click a store, or click a shopper, to set where you are now. Cars drive on the right and can only turn at intersections, but may cut straight across the road when entering or leaving a garage. The layout is simplified for teaching. Store and garage positions are illustrative, not the real floor plan. One cell is 10&nbsp;m.</p>
   </section>
 
   <div class="side">
@@ -212,7 +212,10 @@ const GARAGES = [
   fill(x, y, w, h, "G");
   const mx = x + Math.floor(w / 2), my = y + Math.floor(h / 2);
   const ped = side === "S" ? [mx, y + h] : side === "N" ? [mx, y - 1] : side === "E" ? [x + w, my] : [x - 1, my];
-  return { kind: "garage", id: name, name, rect: [x, y, w, h], x: ped[0], y: ped[1], rx: road[0], ry: road[1], block };
+  // cars leave and enter by the near lane, or cut straight across it to the far lane
+  const [nx, ny] = road, fx = { 0: 1, 1: 0, 46: 47, 47: 46 }[nx];
+  return { kind: "garage", id: name, name, rect: [x, y, w, h], x: ped[0], y: ped[1], block,
+    door: [nx + (nx - fx), ny], lanes: [[nx, ny, 1], [fx, ny, 2]] };
 });
 
 const walkable = (x, y) => inside(x, y) && (T[y][x] === "." || T[y][x] === "x");
@@ -221,7 +224,6 @@ const drivable = (x, y) => inside(x, y) && (T[y][x] === "r" || T[y][x] === "x");
 // ---------- shortest paths ----------
 const SQ = Math.SQRT2;
 const DIR8 = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,SQ],[1,-1,SQ],[-1,1,SQ],[-1,-1,SQ]];
-const DIR4 = DIR8.slice(0, 4);
 const idx = (x, y) => y * COLS + x;
 function makeField(ok, dirs) {
   const cache = new Map();
@@ -263,10 +265,44 @@ function makeField(ok, dirs) {
   }
   return { dist: (a, b) => field(b.x, b.y)[idx(a.x, a.y)], field, route };
 }
-const W = makeField(walkable, DIR8), D = makeField(drivable, DIR4);
+const W = makeField(walkable, DIR8);
+
+// Driving is directed: right-hand traffic, so each lane only flows one way.
+// Turning is only possible where a north-south and an east-west street cross.
+const ROW_DIR = { 0: -1, 1: 1, 15: -1, 16: 1, 30: -1, 31: 1 };   // +1 = eastbound, which keeps to the south lane
+const COL_DIR = { 0: 1, 1: -1, 23: 1, 24: -1, 46: 1, 47: -1 };   // +1 = southbound, which keeps to the west lane
+function carMoves(x, y) {
+  const out = [];
+  if (y in ROW_DIR && drivable(x + ROW_DIR[y], y)) out.push([x + ROW_DIR[y], y]);
+  if (x in COL_DIR && drivable(x, y + COL_DIR[x])) out.push([x, y + COL_DIR[x]]);
+  return out;
+}
+const driveCache = new Map();
+function drive(g1, g2) {
+  if (g1 === g2) return { dist: 0, path: null };
+  const key = g1.id + ">" + g2.id;
+  if (driveCache.has(key)) return driveCache.get(key);
+  const dist = new Float64Array(COLS * ROWS).fill(Infinity), prev = new Int32Array(COLS * ROWS).fill(-1);
+  let queue = [];
+  for (const [x, y, c] of g1.lanes) { dist[idx(x, y)] = c; queue.push([c, x, y]); }
+  while (queue.length) {
+    queue.sort((a, b) => a[0] - b[0]);
+    const [d, x, y] = queue.shift();
+    if (d > dist[idx(x, y)]) continue;
+    for (const [nx, ny] of carMoves(x, y)) {
+      const k = idx(nx, ny);
+      if (d + 1 < dist[k]) { dist[k] = d + 1; prev[k] = idx(x, y); queue.push([d + 1, nx, ny]); }
+    }
+  }
+  let best = Infinity, end = -1;
+  for (const [x, y, c] of g2.lanes) { const v = dist[idx(x, y)] + c; if (v < best) { best = v; end = idx(x, y); } }
+  const path = [];
+  for (let k = end; k !== -1; k = prev[k]) path.unshift([k % COLS, Math.floor(k / COLS)]);
+  const res = { dist: best, path: [g1.door, ...path, g2.door] };
+  driveCache.set(key, res); return res;
+}
 const euclid = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const walkDist = (a, b) => W.dist(a, b);
-const driveDist = (g1, g2) => D.dist({ x: g1.rx, y: g1.ry }, { x: g2.rx, y: g2.ry });
 
 // ---------- shoppers walking between garages and stores ----------
 let seed = 11; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -306,8 +342,8 @@ function plans(a, b, carG) {
   // Plan B: walk to the car, drive to the garage closest to the store, walk to the store and back to that garage
   const g2 = bestGarageFor(b);
   const bWalk = walkDist(a, carG) + 2 * walkDist(g2, b);
-  const drive = g2 === carG ? 0 : driveDist(carG, g2);
-  const B = { g2, walk: bWalk, drive, min: bWalk * M / WALK_M_MIN + (drive ? drive * M / DRIVE_M_MIN + REPARK_MIN : 0),
+  const driveM = drive(carG, g2).dist;
+  const B = { g2, walk: bWalk, drive: driveM, min: bWalk * M / WALK_M_MIN + (driveM ? driveM * M / DRIVE_M_MIN + REPARK_MIN : 0),
     legs: [["walk", a, carG], ["drive", carG, g2], ["walk", g2, b]] };
   return { A, B };
 }
@@ -316,7 +352,7 @@ function plans(a, b, carG) {
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const map = document.getElementById("map"), ctx = map.getContext("2d");
 let cell = 18, C = {};
-const colors = () => { C = Object.fromEntries(["fg","panel","muted","line","plaza","road","roadline","store","anchor","dining","fun","garage","garage-fg","euc","walk","drive","warn"].map(k => [k, css("--" + k)])); };
+const colors = () => { C = Object.fromEntries(["fg","panel","muted","line","plaza","road","roadline","store","anchor","dining","fun","garage","garage-fg","center","euc","walk","drive","warn"].map(k => [k, css("--" + k)])); };
 function layout() {
   const w = map.parentElement.clientWidth - 32 || 900;
   cell = Math.max(7, w / COLS);
@@ -334,12 +370,21 @@ function drawBase() {
     ctx.fillStyle = t === "r" || t === "x" ? C.road : C.plaza;
     ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
   }
-  // lane markings
-  ctx.save(); ctx.strokeStyle = C.roadline; ctx.lineWidth = 1; ctx.setLineDash([cell * 0.6, cell * 0.6]);
+  // center lines separate the two directions; they break at intersections
+  const isCross = (x, y) => (y in ROW_DIR) && (x in COL_DIR);
+  ctx.save(); ctx.strokeStyle = C.center; ctx.lineWidth = Math.max(1.5, cell * 0.08);
   ctx.beginPath();
-  for (const yy of [1, 16, ROWS - 1]) { ctx.moveTo(0, yy * cell); ctx.lineTo(COLS * cell, yy * cell); }
-  for (const xx of [1, 24, COLS - 1]) { ctx.moveTo(xx * cell, 0); ctx.lineTo(xx * cell, ROWS * cell); }
-  ctx.stroke(); ctx.restore();
+  for (const yy of [1, 16, ROWS - 1]) for (let x = 0; x < COLS; x++) if (!isCross(x, yy)) { ctx.moveTo(x * cell, yy * cell); ctx.lineTo((x + 1) * cell, yy * cell); }
+  for (const xx of [1, 24, COLS - 1]) for (let y = 0; y < ROWS; y++) if (!isCross(xx, y)) { ctx.moveTo(xx * cell, y * cell); ctx.lineTo(xx * cell, (y + 1) * cell); }
+  ctx.stroke();
+  // direction arrows: right-hand traffic
+  ctx.strokeStyle = C.roadline; ctx.lineWidth = Math.max(1, cell * 0.08); ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const chevron = (x, y, dx, dy) => { const cxp = px(x), cyp = px(y), a = cell * 0.22;
+    ctx.beginPath(); ctx.moveTo(cxp - dx * a - dy * a, cyp - dy * a - dx * a); ctx.lineTo(cxp + dx * a, cyp + dy * a);
+    ctx.lineTo(cxp - dx * a + dy * a, cyp - dy * a + dx * a); ctx.stroke(); };
+  for (const y in ROW_DIR) for (let x = 3; x < COLS - 2; x += 5) if (!isCross(x, +y) && T[y][x] === "r") chevron(x, +y, ROW_DIR[y], 0);
+  for (const x in COL_DIR) for (let y = 3; y < ROWS - 2; y += 5) if (!isCross(+x, y) && T[y][x] === "r") chevron(+x, y, 0, COL_DIR[x]);
+  ctx.restore();
   // zebra crosswalks
   ctx.save(); ctx.fillStyle = C.panel;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (T[y][x] === "x") {
@@ -431,7 +476,7 @@ function draw() {
   stroke(W.route(a.x, a.y, b.x, b.y), C.walk, better === "A" ? wA : wB, better === "A" ? null : [cell * 0.4, cell * 0.3]);
   if (B.drive) {
     stroke(W.route(a.x, a.y, carG.x, carG.y), C.walk, better === "B" ? wA * 0.8 : wB, [cell * 0.3, cell * 0.3]);
-    stroke(D.route(carG.rx, carG.ry, B.g2.rx, B.g2.ry), C.drive, better === "B" ? wA : wB, better === "B" ? null : [cell * 0.4, cell * 0.3]);
+    stroke(drive(carG, B.g2).path, C.drive, better === "B" ? wA : wB, better === "B" ? null : [cell * 0.4, cell * 0.3]);
     stroke(W.route(B.g2.x, B.g2.y, b.x, b.y), C.walk, better === "B" ? wA * 0.8 : wB, [cell * 0.3, cell * 0.3]);
   }
   drawShoppers(t);
@@ -451,7 +496,7 @@ function panel(a, b, carG, A, B) {
   const vals = [
     ["Straight line", "as the crow flies", e, "--euc"],
     ["Walking", "sidewalks and crosswalks only", w, "--walk"],
-    ["Driving", `garage ${carG.id} → ${B.g2.id}, on the streets`, d, "--drive"],
+    ["Driving", `garage ${carG.id} → ${B.g2.id}, right-hand traffic`, d, "--drive"],
   ];
   const max = Math.max(1, ...vals.map(v => v[2]).filter(isFinite));
   document.getElementById("bars").innerHTML = vals.map(([n, s, v, c]) => `
@@ -465,6 +510,11 @@ function panel(a, b, carG, A, B) {
     if (r >= 1.8) flags.push(["warn", `<b>Close in a straight line, far on foot.</b> ${b.name} is only ${fmtM(e)} away in a straight line, but the walk is ${fmtM(w)} (<span class="mono">${r.toFixed(1)}×</span>) because you have to use a crosswalk.`]);
     else flags.push(["ok", `<b>Fairly direct walk.</b> Walking is <span class="mono">${r.toFixed(2)}×</span> the straight line.`]);
     if (a.block && b.block && a.block !== b.block) flags.push(["ok", `You are going from the ${BLOCK[a.block].toLowerCase()} to the ${BLOCK[b.block].toLowerCase()}, so you need to cross a street.`]);
+  }
+  if (B.drive) {
+    const back = drive(B.g2, carG).dist;
+    if (Math.abs(back - B.drive) > 0.5) flags.push(["warn", `<b>Driving is not symmetric.</b> ${carG.id} → ${B.g2.id} is ${fmtM(B.drive)}, but ${B.g2.id} → ${carG.id} is ${fmtM(back)}, because each lane flows one way. That breaks the symmetry rule, so driving distance is a quasi-metric, not a metric.`]);
+    else flags.push(["ok", `Driving ${carG.id} → ${B.g2.id} and back happen to be the same length here (${fmtM(back)}), but with one-way lanes that is not guaranteed.`]);
   }
   document.getElementById("flags").innerHTML = flags.map(([c, h]) => `<div class="flag ${c === "warn" ? "warn" : ""}">${h}</div>`).join("");
 
